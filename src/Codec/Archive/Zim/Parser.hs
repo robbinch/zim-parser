@@ -67,6 +67,7 @@
 -- Feedback and contributions are welcome on <http://github.com/robbinch/zim-parser>.
 
 
+{-# LANGUAGE DeriveDataTypeable #-}
 module Codec.Archive.Zim.Parser
        (
        -- * High-level Functions
@@ -161,6 +162,7 @@ module Codec.Archive.Zim.Parser
        -- The last offset points to the end of the data area so there is always one more offset than blobs.
        ) where
 
+import Control.Applicative ((<$>), (<*>))
 import Control.Exception (Exception, throw)
 import Control.Monad (when)
 import Data.Char (chr, ord)
@@ -172,11 +174,12 @@ import qualified Data.ByteString.Lazy as BL
 import System.IO (Handle, IOMode(ReadMode), withBinaryFile, openBinaryFile)
 
 import Data.Conduit (($$), (=$), await, Sink)
-import Data.Conduit.Binary (sourceHandleRange, sourceLbs)
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
+import Data.Conduit.Binary (sourceHandleRange, sourceLbs, sinkLbs)
 import Data.Conduit.Serialization.Binary (sinkGet, conduitGet)
+import Data.Conduit.Lzma (decompress)
 
 import Data.Array.IArray ((!), listArray, Array)
-import Codec.Compression.Lzma (decompress)
 import Data.Binary.Get (Get, skip, getWord8, getWord16le, getWord32le, getWord64le, getByteString, getLazyByteStringNul, getRemainingLazyByteString)
 import Numeric (showHex)
 
@@ -311,10 +314,11 @@ getZimDirEntByUrlIndex :: ZimHeader     -- ^ ZIM header
                        -> Int           -- ^ URL index
                        -> IO ZimDirEnt  -- ^ Returns a Directory Entry
 getZimDirEntByUrlIndex hdr hdl i = do
+    let urlPtrPos = Just $ zimUrlPtrPos hdr + 8 * fromIntegral i
     when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
     dePos <- sourceHandleRange hdl urlPtrPos Nothing $$ sinkGet getWord64le
-    sourceHandleRange hdl (Just $ fromIntegral dePos) Nothing $$ sinkGet parseZimDirEnt
-  where urlPtrPos = Just $ zimUrlPtrPos hdr + 8 * fromIntegral i
+    let srcDirEnt = sourceHandleRange hdl (Just $ fromIntegral dePos) Nothing
+    srcDirEnt $$ sinkGet parseZimDirEnt
 
 parseZimDirEnt :: Get ZimDirEnt
 parseZimDirEnt = do
@@ -355,9 +359,10 @@ getZimDirEntByTitleIndex :: ZimHeader     -- ^ ZIM header
                          -> IO ZimDirEnt  -- ^ Returns a Directory Entry
 getZimDirEntByTitleIndex hdr hdl i = do
     when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
-    urlIndex <- sourceHandleRange hdl titlePtrPos Nothing $$ sinkGet getWord32le
+    urlIndex <- srcTitle $$ sinkGet getWord32le
     getZimDirEntByUrlIndex hdr hdl (fromIntegral urlIndex)
   where titlePtrPos = Just $ zimTitlePtrPos hdr + 4 * fromIntegral i
+        srcTitle    = sourceHandleRange hdl titlePtrPos Nothing
 
 -- | Returns (decompressed) Cluster corresponding to Cluster number.
 -- This can throw ErrorCall if there is an error during decompression.
@@ -369,20 +374,20 @@ getZimCluster hdr hdl i = do
     let limit = zimClusterCount hdr - 1
     when (i < 0 || i > limit) . throw $ ZimInvalidIndex i
     let clusterPos = Just $ zimClusterPtrPos hdr + 8 * fromIntegral i
-    (pos0, pos1) <- sourceHandleRange hdl clusterPos Nothing $$
-                      sinkGet $ (,) <$> getWord64le <*> getWord64le
+        src        = sourceHandleRange hdl clusterPos Nothing
+    (pos0, pos1) <- src $$ sinkGet $ (,) <$> getWord64le <*> getWord64le
     -- length of last cluster is determined by checksum pos instead of next cluster pos
     let len = if i == limit
                   then (fromIntegral $ zimChecksumPos hdr) - pos0
                   else pos1 - pos0
         toI = Just . fromIntegral
-    bs <- sourceHandleRange hdl (toI pos0) (toI len) $$
-            sinkGet getRemainingLazyByteString
+        srcCluster = sourceHandleRange hdl (toI pos0) (toI len)
+    bs <- srcCluster $$ sinkGet getRemainingLazyByteString
 
     case BL.uncons bs of
       Just (0, cluster) -> return cluster
       Just (1, cluster) -> return cluster
-      Just (4, cluster) -> return $ decompress cluster
+      Just (4, cluster) -> runResourceT $ sourceLbs cluster $$ decompress Nothing =$ sinkLbs
       Just (x, _)       -> throw . ZimParseError $
         "Cluster " ++ show i ++
         " (offset: " ++ showHex pos0 "" ++ ", length: " ++ show len ++
@@ -398,8 +403,8 @@ getZimBlob :: ZimHeader         -- ^ ZIM header
            -> IO BL.ByteString  -- ^ Returns a lazy bytestring containing blob
 getZimBlob hdr hdl c b = do
     cluster      <- getZimCluster hdr hdl c
-    (pos0, pos1) <- sourceLbs (BL.drop (4 * fromIntegral b) cluster) $$
-                      sinkGet $ (,) <$> getWord32le <*> getWord32le
+    let src = sourceLbs (BL.drop (4 * fromIntegral b) cluster)
+    (pos0, pos1) <- src $$ sinkGet $ (,) <$> getWord32le <*> getWord32le
     let len = pos1 - pos0
     return . BL.take (fromIntegral len) $ BL.drop (fromIntegral pos0) cluster
 
