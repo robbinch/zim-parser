@@ -7,7 +7,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import Data.Char (ord)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust)
 import System.IO (openBinaryFile, IOMode(ReadMode))
 
 import Data.Array.IArray (bounds, (!))
@@ -77,7 +77,7 @@ main = do
         it "can search for title" $ do
             let title = B8.pack "(The Night Time Is) The Right Time"
             res <- searchZimDirEntByTitle smallZim small 'A' title
-            (title, res) `shouldNotBe` (title, Nothing)
+            (title, res) `shouldSatisfy` (isJust . snd)
             (fst . fromJust $ res) `shouldBe` 3
 
         it "can search for non-existent title" $ do
@@ -88,7 +88,7 @@ main = do
         it "can search for title prefix" $ do
             let title = B8.pack "Blue"
             res <- searchZimDirEntByTitlePrefix smallZim small 'A' title
-            (title, res) `shouldNotBe` (title, Nothing)
+            (title, res) `shouldSatisfy` (isJust . snd)
             let Just ((lb, _), (ub, _)) = res
             (lb, ub) `shouldBe` (22, 25)
 
@@ -100,21 +100,21 @@ main = do
         it "can search for first title prefix" $ do
             let title = B8.pack "fav"
             res <- searchZimDirEntByTitlePrefix smallZim small '-' title
-            (title, res) `shouldNotBe` (title, Nothing)
+            (title, res) `shouldSatisfy` (isJust . snd)
             let Just ((lb, _), (ub, _)) = res
             (lb, ub) `shouldBe` (0, 0)
 
         it "can search for last title prefix" $ do
             let title = B8.pack "Title"
             res <- searchZimDirEntByTitlePrefix smallZim small 'M' title
-            (title, res) `shouldNotBe` (title, Nothing)
+            (title, res) `shouldSatisfy` (isJust . snd)
             let Just ((lb, _), (ub, _)) = res
             (lb, ub) `shouldBe` (457, 457)
 
         it "can search for URLs" $ do
             let url = "A/A_Fool_for_You.html"
             res <- searchZimDirEntByUrl smallZim small url
-            (url, res) `shouldNotBe` (url, Nothing)
+            (url, res) `shouldSatisfy` (isJust . snd)
             (fst . fromJust $ res) `shouldBe` 4
 
         it "can search for non-existent URL" $ do
@@ -124,7 +124,7 @@ main = do
 
         it "can get (mimetype, content)" $ do
             res <- getZimUrlContent testSmallFilePath "A/index.htm"
-            res `shouldNotBe` Nothing
+            res `shouldSatisfy` isJust
             let Just (m, c) = res
             (m, BL.length c) `shouldBe` ("text/html", 8637)
 
@@ -134,7 +134,7 @@ main = do
                     url = zimDeUrl de
                     url' = ns `B8.cons` '/' `B8.cons` url
                 res <- searchZimDirEntByUrl hdr hdl url'
-                (url, res) `shouldNotBe` (url, Nothing)
+                (url, res) `shouldSatisfy` (isJust . snd)
                 (zimDeUrl . snd . fromJust $ res) `shouldBe` url
             getAllArticles hdr hdl n = do
               let ns = [0 .. n - 1]
