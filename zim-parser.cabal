@@ -4,47 +4,54 @@
 name:                zim-parser
 version:             0.1.0.0
 synopsis:            Read and parse ZIM files
--- description:         
-homepage:            http://github.com/robbinch/zim
+description:
+  A library to read and parse ZIM (http://openzim.org) files.
+  ZIM files contain offline web content (eg. Wikipedia) which can be browsed
+  locally without an Internet connection.
+homepage:            http://github.com/robbinch/zim-parser
 license:             GPL-3
 license-file:        LICENSE
 author:              Robbin C.
 maintainer:          robbinch33@gmail.com
--- copyright:           
+copyright:           Copyright (c) Robbin C.
 category:            Codec
 build-type:          Simple
 -- extra-source-files:  
 cabal-version:       >=1.10
 
+source-repository head
+  type:                git
+  location:            https://github.com/robbinch/zim-parser.git
+
 library
   exposed-modules:     Codec.Archive.Zim.Parser
   build-depends:
-    base            >= 4.7   && < 4.9,
-    array           >= 0.5   && < 0.6,
-    binary          >= 0.7   && < 0.8,
-    bytestring      >= 0.10  && < 0.11,
-    resourcet       >= 1.1   && < 1.2,
-    conduit         >= 1.2   && < 1.3,
-    conduit-extra   >= 1.1   && < 1.2,
-    binary-conduit  >= 1.2   && < 1.3,
-    lzma-conduit    >= 1.1   && < 1.2
+    base               >= 4.7   && < 4.9,
+    array              >= 0.5   && < 0.6,
+    binary             >= 0.7   && < 0.8,
+    bytestring         >= 0.10  && < 0.11,
+    resourcet          >= 1.1   && < 1.2,
+    conduit            >= 1.2   && < 1.3,
+    conduit-extra      >= 1.1   && < 1.2,
+    binary-conduit     >= 1.2   && < 1.3,
+    lzma-conduit       >= 1.1   && < 1.2
   hs-source-dirs:      src
   default-language:    Haskell2010
 
-Test-Suite test
+Test-Suite ParserSpec
   type:                exitcode-stdio-1.0
-  main-is:             test.hs
+  main-is:             Spec.hs
   hs-source-dirs:      test, src
   build-depends:
-    base            >= 4.7   && < 4.9,
-    array           >= 0.5   && < 0.6,
-    binary          >= 0.7   && < 0.8,
-    bytestring      >= 0.10  && < 0.11,
-    resourcet       >= 1.1   && < 1.2,
-    conduit         >= 1.2   && < 1.3,
-    conduit-extra   >= 1.1   && < 1.2,
-    binary-conduit  >= 1.2   && < 1.3,
-    lzma-conduit    >= 1.1   && < 1.2,
-    hspec           >= 2.1   && < 2.3
+    base               >= 4.7   && < 4.9,
+    array              >= 0.5   && < 0.6,
+    binary             >= 0.7   && < 0.8,
+    bytestring         >= 0.10  && < 0.11,
+    resourcet          >= 1.1   && < 1.2,
+    conduit            >= 1.2   && < 1.3,
+    conduit-extra      >= 1.1   && < 1.2,
+    binary-conduit     >= 1.2   && < 1.3,
+    lzma-conduit       >= 1.1   && < 1.2,
+    hspec              >= 2.1   && < 2.3
   default-language:    Haskell2010
   other-modules:       Codec.Archive.Zim.Parser
