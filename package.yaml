@@ -1,0 +1,38 @@
+---
+name        : zim-parser
+version     : 0.1.0.0
+stability   : stable
+category    : Codec
+synopsis    : Read and parse ZIM files
+description : |
+  zim-parser is a library to read and parse ZIM (http://openzim.org) files.
+  ZiM files contain offline web content (eg. Wikipedia) which can be browsed
+  locally without an Internet connection.
+
+license     : GPL-3
+author      : Robbin C. <robbinch33@gmail.com>
+maintainer  : Robbin C. <robbinch33@gmail.com>
+github      : robbinch/zim-parser
+
+dependencies:
+  - base == 4.*
+  - array
+  - binary
+  - bytestring
+  - resourcet
+  - conduit
+  - conduit-extra
+  - binary-conduit
+  - lzma-conduit
+
+source-dirs: src
+
+library:
+  exposed-modules: Codec.Archive.Zim.Parser
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - hspec == 2.*
