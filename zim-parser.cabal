@@ -14,6 +14,7 @@ homepage:            https://github.com/robbinch/zim-parser#readme
 bug-reports:         https://github.com/robbinch/zim-parser/issues
 author:              Robbin C. <robbinch33@gmail.com>
 maintainer:          Robbin C. <robbinch33@gmail.com>
+copyright:           Copyright (c) 2015 Robbin C.
 license:             GPL-3
 license-file:        LICENSE
 build-type:          Simple

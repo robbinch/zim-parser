@@ -12,6 +12,7 @@ description       : |
 license           : GPL-3
 author            : Robbin C. <robbinch33@gmail.com>
 maintainer        : Robbin C. <robbinch33@gmail.com>
+copyright         : Copyright (c) 2015 Robbin C.
 github            : robbinch/zim-parser
 ghc-options       : -Wall
 extra-source-files: test/wikipedia_en_ray_charles_2015-06.zim
