@@ -165,16 +165,16 @@ module Codec.Archive.Zim.Parser
 import Control.Applicative ((<$>), (<*>))
 import Control.Exception (Exception, throw)
 import Control.Monad (when)
-import Data.Char (chr, ord)
-import Data.Maybe (catMaybes, fromMaybe, fromJust)
+import Data.Char (chr)
+import Data.Maybe (fromJust)
 import Data.Typeable (Typeable)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
-import System.IO (Handle, IOMode(ReadMode), withBinaryFile, openBinaryFile)
+import System.IO (Handle, IOMode(ReadMode), withBinaryFile)
 
 import Data.Conduit (($$), (=$), await, Sink)
-import Control.Monad.Trans.Resource (ResourceT, runResourceT)
+import Control.Monad.Trans.Resource (runResourceT)
 import Data.Conduit.Binary (sourceHandleRange, sourceLbs, sinkLbs)
 import Data.Conduit.Serialization.Binary (sinkGet, conduitGet)
 import Data.Conduit.Lzma (decompress)
@@ -260,7 +260,7 @@ data ZimDirEnt = ZimDirEnt
 -- can be opened with the same ZIM header in order to call
 -- functions in parallel.
 -- If the underlying ZIM file has changed, a new ZIM header should be parsed.
-getZimHeader :: Handle        -- ^ Handle to ZIM file (eg. previously returned from 'openBinaryFile' or 'withBinaryFile')
+getZimHeader :: Handle        -- ^ Handle to ZIM file (eg. previously returned from 'withBinaryFile')
              -> IO ZimHeader  -- ^ Returns ZIM Header
 getZimHeader hdl = src $$ sinkGet parseZimHeader
   where (pos, len) = (Just 0, Just 80)

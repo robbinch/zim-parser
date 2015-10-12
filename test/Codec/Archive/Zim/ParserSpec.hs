@@ -2,11 +2,8 @@
 module Codec.Archive.Zim.ParserSpec (main, spec) where
 
 import Control.Monad (forM_)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
-import Data.Char (ord)
 import Data.Maybe (fromJust, isJust)
 import System.IO (Handle, openBinaryFile, IOMode(ReadMode))
 
@@ -16,6 +13,7 @@ import Test.Hspec
 
 import Codec.Archive.Zim.Parser
 
+testSmallFilePath :: FilePath
 testSmallFilePath = "test/wikipedia_en_ray_charles_2015-06.zim"
 
 main :: IO ()
@@ -32,16 +30,16 @@ spec = do
     describe "zim" $ do
       beforeAll setup $ do
 
-        it "can open Ray Charles ZIM" $ \(smallZim, small) -> do
+        it "can open Ray Charles ZIM" $ \(smallZim, _) -> do
             zimMagicNumber smallZim `shouldBe` 72173914
 
-        it "can get version" $ \(smallZim, small) -> do
+        it "can get version" $ \(smallZim, _) -> do
             zimVersion smallZim `shouldBe` 5
 
-        it "can get article count" $ \(smallZim, small) -> do
+        it "can get article count" $ \(smallZim, _) -> do
             zimArticleCount smallZim `shouldBe` 458
 
-        it "can get cluster count" $ \(smallZim, small) -> do
+        it "can get cluster count" $ \(smallZim, _) -> do
             zimClusterCount smallZim `shouldBe` 215
 
         it "can parse MIME list" $ \(smallZim, small) -> do
@@ -49,10 +47,10 @@ spec = do
             mimeList ! 0 `shouldBe` "application/javascript"
             bounds mimeList `shouldBe` (0, 9)
 
-        it "can get main page" $ \(smallZim, small) -> do
+        it "can get main page" $ \(smallZim, _) -> do
             zimMainPage smallZim `shouldBe` Just 238
 
-        it "can get main page URL" $ \(smallZim, small) -> do
+        it "can get main page URL" $ \_ -> do
             url <- getZimMainPageUrl testSmallFilePath
             url `shouldBe` Just "A/index.htm"
 
@@ -62,8 +60,6 @@ spec = do
             zimDeUrl de `shouldBe` "favicon"
 
         it "can lookup directory entry by Title index" $ \(smallZim, small) -> do
-            de <- getZimDirEntByTitleIndex smallZim small 4
-            zimDeTitle de `shouldBe` "A Fool for You"
             de <- getZimDirEntByTitleIndex smallZim small 3
             zimDeTitle de `shouldBe` "(The Night Time Is) The Right Time"
             zimDeNamespace de `shouldBe` 'A'
@@ -128,7 +124,7 @@ spec = do
             res <- searchZimDirEntByUrl smallZim small url
             res `shouldBe` Nothing
 
-        it "can get (mimetype, content)" $ \(smallZim, small) -> do
+        it "can get (mimetype, content)" $ \_ -> do
             res <- getZimUrlContent testSmallFilePath "A/index.htm"
             res `shouldSatisfy` isJust
             let Just (m, c) = res
@@ -148,7 +144,7 @@ spec = do
                 de <- getZimDirEntByUrlIndex hdr hdl i
                 let url = zimDeUrl de
                 bs <- getZimContentByUrlIndex hdr hdl i
-                (url, bs) `shouldSatisfy` (\(u, b) -> BL.length b > 0)
+                (url, bs) `shouldSatisfy` (\(_, b) -> BL.length b > 0)
 
         it "can search all URLs" $ \(smallZim, small) -> do
           deList <- mapM (getZimDirEntByUrlIndex smallZim small) [0 .. zimArticleCount smallZim - 1]
