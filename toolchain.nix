@@ -1,10 +1,10 @@
 # install with:
 # nix-build -j4 -o result-toolchain toolchain.nix
-{ pkgs ? import <nixpkgs> { } }:
+{ nixpkgs ? import <nixpkgs> { } }:
 
-with pkgs;
+with nixpkgs;
 let
-  oldDrv = import ./default.nix { inherit pkgs; };
+  oldDrv = import ./default.nix { inherit nixpkgs; };
 in lib.overrideDerivation oldDrv (oldAttrs: {
   phases = [ "installPhase" ];
   name = "zim-parser-toolchain";
