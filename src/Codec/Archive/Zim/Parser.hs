@@ -20,6 +20,9 @@
 -- Behind the scenes, conduit is used to read from files so memory usage should
 -- be constant.
 --
+-- ZIM files of Wikimedia Foundation (Wikipedia, Wikibooks, etc) can be
+-- found at http://ftpmirror.your.org/pub/kiwix/zim.
+--
 -- Below is a full example of a Scotty web server that serves a ZIM file
 -- (specified on command line) on localhost port 3000:
 --

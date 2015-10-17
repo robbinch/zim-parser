@@ -4,6 +4,9 @@ This is a library for parsing ZIM (http://openzim.org) files.
 ZIM files contain offline web content (eg, Wikipedia) which
 can be browsed locally without an Internet connection.
 
+ZIM files of Wikimedia Foundation (Wikipedia, Wikibooks, etc) can be
+found at http://ftpmirror.your.org/pub/kiwix/zim.
+
 Below is a full example of a Scotty web server that serves a ZIM file
 (specified on command line) on localhost port 3000:
 ```haskell

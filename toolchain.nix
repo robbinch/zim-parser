@@ -7,7 +7,7 @@ let
   oldDrv = import ./default.nix { inherit nixpkgs; };
 in lib.overrideDerivation oldDrv (oldAttrs: {
   phases = [ "installPhase" ];
-  name = "zim-parser-toolchain";
+  name = oldAttrs.name + "-toolchain";
   installPhase = ''
     mkdir -p $out
     echo "$nativeBuildInputs" >> $out/paths
