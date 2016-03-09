@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:                zim-parser
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Read and parse ZIM files
 description:         zim-parser is a library to read and parse ZIM (http://openzim.org) files.
                      ZiM files contain offline web content (eg. Wikipedia) which can be browsed

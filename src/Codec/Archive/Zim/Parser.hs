@@ -10,15 +10,30 @@
 -- contain offline web content (eg, Wikipedia) which can be browsed locally
 -- without an Internet connection.
 --
--- The high-level functions can be used if it is not a problem to re-open and close
--- the ZIM file on each invocation. For simple browsing on a local device, this
--- should suffice. This also works if the underlying ZIM file is changing.
+-- The API is meant to be intuitive for normal use-cases.
 --
--- The other functions can be used if the caller opts to have more control over
--- resource management.
+-- To get content for "A/index.htm" from ZIM file "file.zim":
 --
--- Behind the scenes, conduit is used to read from files so memory usage should
--- be constant.
+-- > > mimeContent <- "file.zim" `getContent` Url "A/index.htm"
+-- > > :t mimeContent
+-- > mimeContent :: Maybe (B8.ByteString, BL.ByteString)
+-- > > print mimeContent
+-- > Just ("text/html", "<html><head>...</html>")
+--
+-- The above will open the file, parse the ZIM header, lookup the
+-- MIME type and content of the URL, close the file and return the MIME type and
+-- content as a pair. Note that content is a lazy bytestring.
+--
+-- The above operation should suffice for a simple webserver serving a ZIM file.
+-- For finer control, it is possible to cache and reuse the file handle and the
+-- ZIM header.
+--
+-- > > hdl <- openBinaryFile "file.zim" ReadMode
+-- > > hdr <- getHeader hdl
+-- > > :t hdr
+-- > hdr :: ZimHeader
+-- > > (hdl, hdr) `getContent` Url "A/index.htm"
+-- > Just ("text/html", "<html><head>...</html>")
 --
 -- ZIM files of Wikimedia Foundation (Wikipedia, Wikibooks, etc) can be
 -- found at http://ftpmirror.your.org/pub/kiwix/zim.
@@ -34,7 +49,7 @@
 -- > import System.Environment (getArgs)
 -- > import Network.HTTP.Types.Status (status404)
 -- > import Web.Scotty
--- > import Codec.Archive.Zim.Parser (getZimMainPageUrl, getZimUrlContent)
+-- > import Codec.Archive.Zim.Parser (getMainPageUrl, getContent, Url(..))
 -- >
 -- > main :: IO ()
 -- > main = do
@@ -46,17 +61,17 @@
 -- >
 -- > redirectToZimMainPage :: FilePath -> ActionM ()
 -- > redirectToZimMainPage fp = do
--- >     res <- liftIO $ getZimMainPageUrl fp
+-- >     res <- liftIO $ getMainPageUrl fp
 -- >     case res of
 -- >       Nothing -> do
 -- >         status status404
 -- >         text "This ZIM file has no main page specified!"
--- >       Just url -> redirect . fromStrict $ decodeUtf8 url
+-- >       Just (Url url) -> redirect . fromStrict $ decodeUtf8 url
 -- >
 -- > serveZimUrl :: FilePath -> ActionM ()
 -- > serveZimUrl fp = do
 -- >     url <- (encodeUtf8 . toStrict) <$> param "1"
--- >     res <- liftIO $ getZimUrlContent fp url
+-- >     res <- liftIO $ fp `getContent` Url url
 -- >     case res of
 -- >       Nothing -> do
 -- >         liftIO . putStrLn $ "Invalid URL: " ++ show url
@@ -69,33 +84,45 @@
 --
 -- Feedback and contributions are welcome on <http://github.com/robbinch/zim-parser>.
 
-
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Codec.Archive.Zim.Parser
        (
-       -- * High-level Functions
-       -- | The following high-level functions are sufficient to program a simple webserver that serves ZIM files (see example above).
-         getZimMainPageUrl
-       , getZimUrlContent
-       -- * Searching
-       , searchZimDirEntByUrl
-       , searchZimDirEntByTitle
-       , searchZimDirEntByTitlePrefix
+       -- * Functions
+         getHeader
+       , getMimeList
+       , getDE
+       , getMainPageUrl
+       , getCluster
+       , getBlob
+       , getContent
+       , searchDE
+       , MimeList
+       , mkNsTitle
+       , mkNsTitlePrefix
+       , mkNsUrl
+       , RunZim
+       , ZimGetDE
+       , ZimSearchDE
+       , ZimGetContent
        -- * Exceptions
        , ZimException(..)
        -- * ZIM Header
        , ZimHeader(..)
-       , getZimHeader
-       , getZimMimeList
        -- * ZIM Directory Entry
        , ZimDirEntType(..)
        , ZimDirEnt(..)
-       , getZimDirEntByUrlIndex
-       , getZimDirEntByTitleIndex
-       -- * ZIM Content
-       , getZimCluster
-       , getZimBlob
-       , getZimContentByUrlIndex
+       , UrlIndex(..)
+       , TitleIndex(..)
+       , ClusterNumber(..)
+       , BlobNumber(..)
+       , Cluster(..)
+       , Blob(..)
+       , Url(..)
+       , Title
+       , TitlePrefix
        -- * ZIM file format
        -- | Following is a short summary of the ZIM file format.
        -- The authoritative reference is at http://www.openzim.org/wiki/ZIM_file_format.
@@ -257,17 +284,40 @@ data ZimDirEnt = ZimDirEnt
     -- , zimDeParameter     :: BL.ByteString -- unused
     } deriving (Eq, Show)
 
--- | Parses ZIM Header from a file handle.
--- A ZIM Header is used by most of the functions in this module.
--- For better performance or resource management, multiple file handles
--- can be opened with the same ZIM header in order to call
--- functions in parallel.
--- If the underlying ZIM file has changed, a new ZIM header should be parsed.
-getZimHeader :: Handle        -- ^ Handle to ZIM file (eg. previously returned from 'withBinaryFile')
-             -> IO ZimHeader  -- ^ Returns ZIM Header
-getZimHeader hdl = src $$ sinkGet parseZimHeader
-  where (pos, len) = (Just 0, Just 80)
-        src        = sourceHandleRange hdl pos len
+-- | List of Mime Types
+type MimeList = Array Int B8.ByteString
+
+-- | Wrapper for URL index
+newtype UrlIndex      = UrlIndex      Int deriving (Eq, Ord, Show)
+-- | Wrapper for Title index
+newtype TitleIndex    = TitleIndex    Int deriving (Eq, Ord, Show)
+-- | Wrapper for Cluster number
+newtype ClusterNumber = ClusterNumber Int deriving (Eq, Ord, Show)
+-- | Wrapper for Blob number
+newtype BlobNumber    = BlobNumber    Int deriving (Eq, Ord, Show)
+
+-- | Wrapper for Url
+newtype Url = Url B.ByteString deriving (Eq, Ord, Show)
+-- | Construct a Url with a Namespace.
+mkNsUrl :: Char -> B.ByteString -> Url
+mkNsUrl c s = Url $ c `B8.cons` '/' `B8.cons` s
+
+-- | Wrapper for Title
+newtype Title = Title B.ByteString deriving (Eq, Ord, Show)
+-- | Construct a Title with a Namespace.
+mkNsTitle :: Char -> B.ByteString -> Title
+mkNsTitle c s = Title $ c `B8.cons` '/' `B8.cons` s
+
+-- | Wrapper for Title Prefix
+newtype TitlePrefix = TitlePrefix B.ByteString deriving (Eq, Ord, Show)
+-- | Construct a TitlePrefix with a Namespace.
+mkNsTitlePrefix :: Char -> B.ByteString -> TitlePrefix
+mkNsTitlePrefix c s = TitlePrefix $ c `B8.cons` '/' `B8.cons` s
+
+-- | Wrapper for Cluster
+newtype Cluster = Cluster {unCluster :: BL.ByteString}
+-- | Wrapper for Blob
+newtype Blob = Blob {unBlob :: BL.ByteString}
 
 parseZimHeader :: Get ZimHeader
 parseZimHeader = do
@@ -290,15 +340,25 @@ parseZimHeader = do
                        (if layoutPage == 0xffffffff then Nothing else Just layoutPage)
                        checksumPos
 
--- | Parses MIME List from a ZIM header and a file handle.
-getZimMimeList :: ZimHeader                     -- ^ ZIM header
-               -> Handle                        -- ^ Handle to ZIM file
-               -> IO (Array Int B8.ByteString)  -- ^ Returns array of MIME types
-getZimMimeList hdr hdl = do
-    mimeList <- src $$ parseByteStringsNul
-    return $ listArray (0, length mimeList) mimeList
-  where (pos, len) = (Just $ zimMimeListPos hdr, Nothing)
-        src        = sourceHandleRange hdl pos len
+-- | Instances of this class represent a Zim File and are able to perform ZIM operations (getMimeList, getContent, etc). Valid instances include a Handle to a ZIM file, a FilePath to a ZIM file, or a (Handle, ZimHeader) where ZimHeader is parsed previously (so it does not need to be reparsed).
+class RunZim h where
+    runZim :: h -> (Handle -> ZimHeader -> IO a) -> IO a
+
+instance RunZim Handle where
+    runZim hdl f = do
+        hdr <- src $$ sinkGet parseZimHeader
+        f hdl hdr
+      where (pos, len) = (Just 0, Just 80)
+            src        = sourceHandleRange hdl pos len
+
+instance RunZim (Handle, ZimHeader) where
+    runZim x f = uncurry f x
+
+instance RunZim FilePath where
+    runZim fp f = withBinaryFile fp ReadMode $ \hdl -> runZim hdl f
+
+getHeader :: RunZim h => h -> IO ZimHeader
+getHeader h = runZim h $ \_ hdr -> return hdr
 
 -- Parses a list of null-terminated byte sequence.
 -- Last entry is zero length (end of block is always 2 null bytes).
@@ -311,17 +371,12 @@ parseByteStringsNul = conduitGet getLazyByteStringNul =$ loop id
                    in if B8.null bs then return (front []) else loop (front . (bs:))
             )
 
--- | Returns Directory Entry corresponding to URL index.
-getZimDirEntByUrlIndex :: ZimHeader     -- ^ ZIM header
-                       -> Handle        -- ^ Handle to ZIM file
-                       -> Int           -- ^ URL index
-                       -> IO ZimDirEnt  -- ^ Returns a Directory Entry
-getZimDirEntByUrlIndex hdr hdl i = do
-    let urlPtrPos = Just $ zimUrlPtrPos hdr + 8 * fromIntegral i
-    when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
-    dePos <- sourceHandleRange hdl urlPtrPos Nothing $$ sinkGet getWord64le
-    let srcDirEnt = sourceHandleRange hdl (Just $ fromIntegral dePos) Nothing
-    srcDirEnt $$ sinkGet parseZimDirEnt
+getMimeList :: RunZim h => h -> IO MimeList
+getMimeList h = runZim h $ \hdl hdr -> do
+    let (pos, len) = (Just $ zimMimeListPos hdr, Nothing)
+        src        = sourceHandleRange hdl pos len
+    mimeList <- src $$ parseByteStringsNul
+    return $ listArray (0, length mimeList) mimeList
 
 parseZimDirEnt :: Get ZimDirEnt
 parseZimDirEnt = do
@@ -355,25 +410,27 @@ parseZimDirEnt = do
                        -- specs: title is same as url if title is empty
                        (if B.null title then url else title)
 
--- | Returns Directory Entry corresponding to Title index.
-getZimDirEntByTitleIndex :: ZimHeader     -- ^ ZIM header
-                         -> Handle        -- ^ Handle to ZIM file
-                         -> Int           -- ^ Title index
-                         -> IO ZimDirEnt  -- ^ Returns a Directory Entry
-getZimDirEntByTitleIndex hdr hdl i = do
-    when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
-    urlIndex <- srcTitle $$ sinkGet getWord32le
-    getZimDirEntByUrlIndex hdr hdl (fromIntegral urlIndex)
-  where titlePtrPos = Just $ zimTitlePtrPos hdr + 4 * fromIntegral i
-        srcTitle    = sourceHandleRange hdl titlePtrPos Nothing
+class ZimGetDE k where
+    getDE :: RunZim h => h -> k -> IO ZimDirEnt
 
--- | Returns (decompressed) Cluster corresponding to Cluster number.
--- This can throw ErrorCall if there is an error during decompression.
-getZimCluster :: ZimHeader         -- ^ ZIM header
-              -> Handle            -- ^ Handle to ZIM file
-              -> Int               -- ^ Cluster number
-              -> IO BL.ByteString  -- ^ Returns a lazy bytestring containing cluster
-getZimCluster hdr hdl i = do
+instance ZimGetDE UrlIndex where
+    getDE h (UrlIndex i) = runZim h $ \hdl hdr -> do
+        let urlPtrPos = Just $ zimUrlPtrPos hdr + 8 * fromIntegral i
+        when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
+        dePos <- sourceHandleRange hdl urlPtrPos Nothing $$ sinkGet getWord64le
+        let srcDirEnt = sourceHandleRange hdl (Just $ fromIntegral dePos) Nothing
+        srcDirEnt $$ sinkGet parseZimDirEnt
+
+instance ZimGetDE TitleIndex where
+    getDE h (TitleIndex i) = runZim h $ \hdl hdr -> do
+        let titlePtrPos = Just $ zimTitlePtrPos hdr + 4 * fromIntegral i
+            srcTitle    = sourceHandleRange hdl titlePtrPos Nothing
+        when (i < 0 || i >= zimArticleCount hdr) . throw $ ZimInvalidIndex i
+        urlIndex <- srcTitle $$ sinkGet getWord32le
+        (hdl, hdr) `getDE` (UrlIndex $ fromIntegral urlIndex)
+
+getCluster :: RunZim h => h -> ClusterNumber -> IO Cluster
+getCluster h (ClusterNumber i) = runZim h $ \hdl hdr -> do
     let limit = zimClusterCount hdr - 1
     when (i < 0 || i > limit) . throw $ ZimInvalidIndex i
     let clusterPos = Just $ zimClusterPtrPos hdr + 8 * fromIntegral i
@@ -381,16 +438,17 @@ getZimCluster hdr hdl i = do
     (pos0, pos1) <- src $$ sinkGet $ (,) <$> getWord64le <*> getWord64le
     -- length of last cluster is determined by checksum pos instead of next cluster pos
     let len = if i == limit
-                  then (fromIntegral $ zimChecksumPos hdr) - pos0
+                  then fromIntegral (zimChecksumPos hdr) - pos0
                   else pos1 - pos0
         toI = Just . fromIntegral
         srcCluster = sourceHandleRange hdl (toI pos0) (toI len)
     bs <- srcCluster $$ sinkGet getRemainingLazyByteString
 
     case BL.uncons bs of
-      Just (0, cluster) -> return cluster
-      Just (1, cluster) -> return cluster
-      Just (4, cluster) -> runResourceT $ sourceLbs cluster $$ decompress Nothing =$ sinkLbs
+      Just (0, cluster) -> return $ Cluster cluster
+      Just (1, cluster) -> return $ Cluster cluster
+      Just (4, cluster) ->
+        Cluster <$> (runResourceT $ sourceLbs cluster $$ decompress Nothing =$ sinkLbs)
       Just (x, _)       -> throw . ZimParseError $
         "Cluster " ++ show i ++
         " (offset: " ++ showHex pos0 "" ++ ", length: " ++ show len ++
@@ -398,31 +456,88 @@ getZimCluster hdr hdl i = do
       Nothing           -> throw . ZimParseError $
         "Insufficient bytes for cluster " ++ show i
 
--- | Returns Blob given Cluster and Blob number.
-getZimBlob :: ZimHeader         -- ^ ZIM header
-           -> Handle            -- ^ Handle to ZIM file
-           -> Int               -- ^ Cluster Number
-           -> Int               -- ^ Blob Number
-           -> IO BL.ByteString  -- ^ Returns a lazy bytestring containing blob
-getZimBlob hdr hdl c b = do
-    cluster      <- getZimCluster hdr hdl c
+getBlob :: RunZim h => h -> (ClusterNumber, BlobNumber) -> IO Blob
+getBlob h (c, BlobNumber b) = do
+    Cluster cluster <- h `getCluster` c
     let src = sourceLbs (BL.drop (4 * fromIntegral b) cluster)
     (pos0, pos1) <- src $$ sinkGet $ (,) <$> getWord32le <*> getWord32le
     let len = pos1 - pos0
-    return . BL.take (fromIntegral len) $ BL.drop (fromIntegral pos0) cluster
+    return . Blob . BL.take (fromIntegral len) $ BL.drop (fromIntegral pos0) cluster
 
--- | Returns content given URL index. Redirects are handled automatically
-getZimContentByUrlIndex :: ZimHeader         -- ^ ZIM header
-                        -> Handle            -- ^ Handle to ZIM file
-                        -> Int               -- ^ URL index
-                        -> IO BL.ByteString  -- ^ Returns a lazy bytestring containing content
-getZimContentByUrlIndex hdr hdl i = do
-    de <- getZimDirEntByUrlIndex hdr hdl i
-    case zimDeType de of
-      ZimRedirectEntry -> getZimContentByUrlIndex hdr hdl (fromJust $ zimDeRedirectIndex de)
-      ZimArticleEntry  -> let (Just c, Just b) = (zimDeClusterNumber de, zimDeBlobNumber de)
-                          in getZimBlob hdr hdl c b
-      _                -> return BL.empty
+-- | Returns URL of main page in ZIM.
+-- This URL can be used for redirecting to the actual page.
+getMainPageUrl :: RunZim h => h -> IO (Maybe Url)
+getMainPageUrl h = runZim h $ \hdl hdr ->
+        case zimMainPage hdr of
+            Nothing -> return Nothing
+            Just i  -> do
+              de <- (hdl, hdr) `getDE` UrlIndex i
+              return . Just $ mkNsUrl (zimDeNamespace de) (zimDeUrl de)
+
+class ZimGetContent k where
+    -- | Get (MIME type, Content). Note that Content is lazy.
+    getContent :: RunZim h => h -> k -> IO (Maybe (B.ByteString, BL.ByteString))
+
+instance ZimGetContent (MimeList, ZimDirEnt) where
+    getContent h (ml, de) = runZim h $ \hdl hdr -> do
+        case zimDeType de of
+          ZimRedirectEntry ->
+            let u = UrlIndex . fromJust $ zimDeRedirectIndex de
+            in (hdl, hdr) `getDE` u >>= ((hdl, hdr) `getContent`)
+
+          ZimArticleEntry  -> do
+            let (Just c, Just b) = (zimDeClusterNumber de, zimDeBlobNumber de)
+            content <- unBlob <$> (hdl, hdr) `getBlob` (ClusterNumber c, BlobNumber b)
+            return $ Just (ml ! zimDeMimeType de, content)
+
+          _                ->
+            return $ Just (ml ! zimDeMimeType de, BL.empty)
+
+instance ZimGetContent ZimDirEnt where
+    getContent h de = runZim h $ \hdl hdr -> do
+      ml <- getMimeList (hdl, hdr)
+      (hdl, hdr) `getContent` (ml, de)
+
+instance ZimGetContent (MimeList, Url) where
+    getContent h (ml, url) = runZim h $ \hdl hdr -> do
+      des <- (hdl, hdr) `searchDE` url
+      case des of
+        [] -> return Nothing
+        ((_, de) : _) -> (hdl, hdr) `getContent` (ml, de)
+
+instance ZimGetContent Url where
+    getContent h url = runZim h $ \hdl hdr -> do
+      ml <- getMimeList (hdl, hdr)
+      (hdl, hdr) `getContent` (ml, url)
+
+instance ZimGetContent (MimeList, Title) where
+    getContent h (ml, title) = runZim h $ \hdl hdr -> do
+      des <- (hdl, hdr) `searchDE` title
+      case des of
+        [] -> return Nothing
+        ((_, de) : _) -> (hdl, hdr) `getContent` (ml, de)
+instance ZimGetContent Title where
+    getContent h title = runZim h $ \hdl hdr -> do
+      ml <- getMimeList (hdl, hdr)
+      (hdl, hdr) `getContent` (ml, title)
+
+instance ZimGetContent (MimeList, UrlIndex) where
+    getContent h (ml, u) = runZim h $ \hdl hdr -> do
+      de <- (hdl, hdr) `getDE` u
+      (hdl, hdr) `getContent` (ml, de)
+instance ZimGetContent UrlIndex where
+    getContent h u = runZim h $ \hdl hdr -> do
+      ml <- getMimeList (hdl, hdr)
+      (hdl, hdr) `getContent` (ml, u)
+
+instance ZimGetContent (MimeList, TitleIndex) where
+    getContent h (ml, t) = runZim h $ \hdl hdr -> do
+      de <- (hdl, hdr) `getDE` t
+      (hdl, hdr) `getContent` (ml, de)
+instance ZimGetContent TitleIndex where
+    getContent h t = runZim h $ \hdl hdr -> do
+      ml <- getMimeList (hdl, hdr)
+      (hdl, hdr) `getContent` (ml, t)
 
 -- Binary Search implementation used for searching sorted URL and Title lists.
 binarySearch :: (Int -> IO (Ordering, a)) -> Int -> Int -> IO (Maybe a)
@@ -437,107 +552,74 @@ binarySearch f low high =
               GT -> binarySearch f (mid + 1) high
               EQ -> return $ Just x
 
--- | Search for a Directory Entry given a URL.
--- URL must be prefixed with Namespace (eg. "A\/Blue.html" or "I\/favicon.png").
-searchZimDirEntByUrl :: ZimHeader                    -- ^ ZIM header
-                     -> Handle                       -- ^ Handle to ZIM file
-                     -> B.ByteString                 -- ^ URL to search for
-                     -> IO (Maybe (Int, ZimDirEnt))  -- ^ Returns (URL Index, Directory Entry) if found.
-searchZimDirEntByUrl hdr hdl url =
-    binarySearch f 0 (zimArticleCount hdr - 1)
-  -- prepend namespace when comparing URLs
-  where f i = do
-          de <- getZimDirEntByUrlIndex hdr hdl i
-          let v = zimDeNamespace de `B8.cons` '/' `B8.cons` zimDeUrl de
-          return (compare url v, (i, de))
+class ZimSearchDE k where
+    -- | Search for a Directory Entry on a RunZim.
+    -- When searching for a:
+    --
+    --  [@Url@]    Returns either 0 (not found) or 1 element.
+    --  [@Title@]  Returns either 0 (not found) or 1 element.
+    --  [@TitlePrefix@] Returns either 0 (not found) or 2 elements corresponding to lower and upper bound of titles containing the prefix.
+    --
+    searchDE :: RunZim h => h -> k -> IO [(Int, ZimDirEnt)]
 
--- | Search for a Directory Entry given a Title and namespace.
-searchZimDirEntByTitle :: ZimHeader                   -- ^ ZIM header
-                       -> Handle                      -- ^ Handle to ZIM file
-                       -> Char                        -- ^ Namespace to search for
-                       -> B.ByteString                -- ^ Title to search for
-                       -> IO (Maybe (Int, ZimDirEnt)) -- ^ Returns (Title Index, Directory Entry) if found
-searchZimDirEntByTitle hdr hdl n title =
-    binarySearch f 0 (zimArticleCount hdr - 1)
-  where title' = n `B8.cons` '/' `B8.cons` title
-        f i = do
-          de <- getZimDirEntByTitleIndex hdr hdl i
-          let v = zimDeNamespace de `B8.cons` '/' `B8.cons` zimDeTitle de
-          return (compare title' v, (i, de))
+instance ZimSearchDE Url where
+    searchDE h url = runZim h $ \hdl hdr -> do
+        let f i = do
+                de <- (hdl, hdr) `getDE` UrlIndex i
+                let v = mkNsUrl (zimDeNamespace de) (zimDeUrl de)
+                return (compare url v, (UrlIndex i, de))
+        res <- binarySearch f 0 (zimArticleCount hdr - 1)
+        return $ maybe [] (\(UrlIndex i, r) -> [(i, r)]) res
 
--- | Search for lower and upper bounds of Title indices that contains prefix in their title.
--- Eg, if title list comprises \[ \"A\", \"Ba\", \"Bb\", \"Bc\", \"C\" \] prefix
--- search for \"B\" will return bounds corresponding to (\"Ba\", \"Bc\").
-searchZimDirEntByTitlePrefix :: ZimHeader     -- ^ ZIM header
-                             -> Handle        -- ^ Handle to ZIM file
-                             -> Char          -- ^ Namespace
-                             -> B.ByteString  -- ^ Title Prefix
-                             -> IO (Maybe ((Int, ZimDirEnt), (Int, ZimDirEnt)))  -- ^ Returns ((Lower Title Index, Lower Directory Entry), (Upper Title Index, Upper Directory Entry)) if found.
-searchZimDirEntByTitlePrefix hdr hdl n pre = do
-    lb <- binarySearch lowerBound 0 limit
-    case lb of
-      Nothing -> return Nothing
-      _ -> do
-        ub <- binarySearch upperBound 0 limit
-        return . Just $ (fromJust lb, fromJust ub)
-  where pre' = n `B8.cons` '/' `B8.cons` pre
-        preLen = B8.length pre
-        limit = zimArticleCount hdr - 1
-        -- extracts title to compare from Directory Entry
-        mkT x = zimDeNamespace x `B8.cons` '/' `B8.cons` B8.take preLen (zimDeTitle x)
-        g idx = (\x -> (x, mkT x)) <$> getZimDirEntByTitleIndex hdr hdl idx
-        -- i has to be the entry just before prefix matches
-        lowerBound i = do
-          de <- getZimDirEntByTitleIndex hdr hdl i
-          case compare pre' (mkT de) of
-            -- if prefix matches, we still return LT as we want to find the entry BEFORE.
-            -- special case: if i = 0, then this is the lower bound.
-            EQ  -> if i == 0
-                      then return (EQ, (i, de))
-                      else return (LT, (i, de))
-            lgt -> do
-              -- if succeeding entry has prefix, that is the lower bound.
-              (de', v') <- g (i + 1)
-              if pre' `B8.isPrefixOf` v'
-                 then return (EQ, (i + 1, de'))
-                 else return (lgt, (i, de))
-        upperBound i = do
-          de <- getZimDirEntByTitleIndex hdr hdl i
-          case compare pre' (mkT de) of
-            EQ  -> if i == limit
-                      then return (EQ, (i, de))
-                      else return (GT, (i, de))
-            lgt -> do
-              (de', v') <- g (i - 1)
-              if pre' `B8.isPrefixOf` v'
-                 then return (EQ, (i - 1, de'))
-                 else return (lgt, (i, de))
+instance ZimSearchDE Title where
+    searchDE h title = runZim h $ \hdl hdr -> do
+        let f i = do
+                de <- (hdl, hdr) `getDE` TitleIndex i
+                let v = mkNsTitle (zimDeNamespace de) (zimDeTitle de)
+                return (compare title v, (TitleIndex i, de))
+        res <- binarySearch f 0 (zimArticleCount hdr - 1)
+        return $ maybe [] (\(TitleIndex i, r) -> [(i, r)]) res
 
--- | Returns URL of main page in ZIM.
--- This URL can be used for redirecting to the actual page.
-getZimMainPageUrl :: FilePath                 -- ^ Path to ZIM file
-                  -> IO (Maybe B.ByteString)  -- ^ Returns URL if found
-getZimMainPageUrl fp = do
-    withBinaryFile fp ReadMode $ \hdl -> do
-        hdr <- getZimHeader hdl
-        case zimMainPage hdr of
-            Nothing -> return Nothing
-            Just i  -> do
-              de <- getZimDirEntByUrlIndex hdr hdl i
-              return . Just $ zimDeNamespace de `B8.cons` '/' `B8.cons` zimDeUrl de
+instance ZimSearchDE TitlePrefix where
+    searchDE h (TitlePrefix pre) = runZim h $ \hdl hdr -> do
+        let preLen = B8.length pre - 2  -- minus namespace prefix
+            limit = zimArticleCount hdr - 1
+             -- extracts title to compare from Directory Entry
+            mkT x = mkNsTitle (zimDeNamespace x) (B8.take preLen (zimDeTitle x))
+            g idx = (\x -> (x, mkT x)) <$> (hdl, hdr) `getDE` idx
+            -- i has to be the entry just before prefix matches
+            lowerBound i = do
+              de <- (hdl, hdr) `getDE` TitleIndex i
+              case compare (Title pre) (mkT de) of
+                -- if prefix matches, we still return LT as we want to find the entry BEFORE.
+                -- special case: if i = 0, then this is the lower bound.
+                EQ  -> if i == 0
+                          then return (EQ, (TitleIndex i, de))
+                          else return (LT, (TitleIndex i, de))
+                lgt -> do
+                  -- if succeeding entry has prefix, that is the lower bound.
+                  (de', Title v') <- g $ TitleIndex (i + 1)
+                  if pre `B8.isPrefixOf` v'
+                    then return (EQ, (TitleIndex $ i + 1, de'))
+                    else return (lgt, (TitleIndex i, de))
+            upperBound i = do
+              de <- (hdl, hdr) `getDE` TitleIndex i
+              case compare (Title pre) (mkT de) of
+                EQ  -> if i == limit
+                          then return (EQ, (TitleIndex i, de))
+                          else return (GT, (TitleIndex i, de))
+                lgt -> do
+                  (de', Title v') <- g $ TitleIndex (i - 1)
+                  if pre `B8.isPrefixOf` v'
+                    then return (EQ, (TitleIndex $ i - 1, de'))
+                    else return (lgt, (TitleIndex i, de))
 
--- | Returns (MIME type, content) of URL, ready to be served via HTTP.
--- Note that MIME type is a strict bytestring while Content is lazy.
-getZimUrlContent :: FilePath                                  -- ^ Path to ZIM file
-                 -> B.ByteString                              -- ^ URL
-                 -> IO (Maybe (B.ByteString, BL.ByteString))  -- ^ Returns (MIME type, content) if found
-getZimUrlContent fp url = do
-    withBinaryFile fp ReadMode $ \hdl -> do
-        hdr <- getZimHeader hdl
-        res <- searchZimDirEntByUrl hdr hdl url
-        case res of
-            Nothing -> return Nothing
-            Just (i, de) -> do
-              mimeList <- getZimMimeList hdr hdl
-              content  <- getZimContentByUrlIndex hdr hdl i
-              return $ Just (mimeList ! zimDeMimeType de, content)
+        lb <- binarySearch lowerBound 0 limit
+        case lb of
+          Nothing -> return []
+          _ -> do
+            ub <- binarySearch upperBound 0 limit
+            let Just (TitleIndex lbi, lb') = lb
+                Just (TitleIndex ubi, ub') = ub
+            return [(lbi, lb'), (ubi, ub')]
+

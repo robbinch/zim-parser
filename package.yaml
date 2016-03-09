@@ -1,6 +1,6 @@
 ---
 name              : zim-parser
-version           : 0.1.0.0
+version           : 0.2.0.0
 stability         : alpha
 category          : Codec
 synopsis          : Read and parse ZIM files

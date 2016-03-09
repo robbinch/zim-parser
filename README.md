@@ -18,7 +18,7 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.Environment (getArgs)
 import Network.HTTP.Types.Status (status404)
 import Web.Scotty
-import Codec.Archive.Zim.Parser (getZimMainPageUrl, getZimUrlContent)
+import Codec.Archive.Zim.Parser (getMainPageUrl, getContent, Url(..))
 
 main :: IO ()
 main = do
@@ -30,17 +30,17 @@ main = do
 
 redirectToZimMainPage :: FilePath -> ActionM ()
 redirectToZimMainPage fp = do
-    res <- liftIO $ getZimMainPageUrl fp
+    res <- liftIO $ getMainPageUrl fp
     case res of
       Nothing -> do
         status status404
         text "This ZIM file has no main page specified!"
-      Just url -> redirect . fromStrict $ decodeUtf8 url
+      Just (Url url) -> redirect . fromStrict $ decodeUtf8 url
 
 serveZimUrl :: FilePath -> ActionM ()
 serveZimUrl fp = do
     url <- (encodeUtf8 . toStrict) <$> param "1"
-    res <- liftIO $ getZimUrlContent fp url
+    res <- liftIO $ fp `getContent` Url url
     case res of
       Nothing -> do
         liftIO . putStrLn $ "Invalid URL: " ++ show url
