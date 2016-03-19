@@ -1,2 +1,2 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "lts-3_8" }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "lts-5_8" }:
 nixpkgs.pkgs.haskell.packages.${compiler}.callPackage ./zim-parser.nix { }
