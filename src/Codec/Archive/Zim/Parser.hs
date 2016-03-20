@@ -82,7 +82,8 @@
 -- >         setHeader "Content-Type" (fromStrict $ decodeUtf8 mimeType)
 -- >         raw content
 --
--- Feedback and contributions are welcome on <http://github.com/robbinch/zim-parser>.
+-- Feedback and contributions are welcome on
+-- <http://github.com/robbinch/zim-parser>.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -90,7 +91,7 @@
 
 module Codec.Archive.Zim.Parser
        (
-       -- * Functions
+-- * Functions
          getHeader
        , getMimeList
        , getDE
@@ -107,11 +108,11 @@ module Codec.Archive.Zim.Parser
        , ZimGetDE
        , ZimSearchDE
        , ZimGetContent
-       -- * Exceptions
+-- * Exceptions
        , ZimException(..)
-       -- * ZIM Header
+-- * ZIM Header
        , ZimHeader(..)
-       -- * ZIM Directory Entry
+-- * ZIM Directory Entry
        , ZimDirEntType(..)
        , ZimDirEnt(..)
        , UrlIndex(..)
@@ -123,73 +124,80 @@ module Codec.Archive.Zim.Parser
        , Url(..)
        , Title
        , TitlePrefix
-       -- * ZIM file format
-       -- | Following is a short summary of the ZIM file format.
-       -- The authoritative reference is at http://www.openzim.org/wiki/ZIM_file_format.
-       --
-       -- === 1. ZIM header
-       -- This is an 80-byte header (see 'ZimHeader'). Among other things, it contains file offsets to the below.
-       --
-       -- === 2. List of MIME types
-       -- This is a sequence of null-terminated strings (eg. @text\/html@, @text\/javascript@). The last string is zero length, so
-       -- the end always consists of 2 consecutive null bytes.
-       --
-       -- === 3. List of URLs
-       -- This is a sequence of 8-byte file offsets, each pointing to a directory entry. This list is sorted by the directory entries' URL.
-       --
-       -- 'getZimDirEntByUrlIndex' looks up this table to return a directory entry.
-       --
-       -- === 4. List of Titles
-       -- This is a sequence of 4-byte indices, each pointing to a URL above (which in turn point to a directory entry).
-       -- This list is sorted by the directory entries' Title.
-       --
-       -- 'getZimDirEntByTitleIndex' uses this table to return a directory entry.
-       --
-       -- === 5. Directory Entries
-       -- This is a sequence of Directory Entries (see 'ZimDirEnt').
-       -- The first 2 bytes determine the type of this entry, which also determine the length.
-       -- Contents include:
-       --
-       -- ==== a. MIME type
-       -- This 2-byte field means:
-       --
-       -- [@0xffff@] This directory entry is a 'ZimRedirectEntry'.
-       -- [@0xfffe@] This directory entry is a 'ZimLinkTarget'.
-       -- [@0xfffd@] This directory entry is a 'ZimDeletedEntry'.
-       -- [@any other value@] This directory entry is a 'ZimArticleEntry' and this index into the MIME list from above determines its MIME type.
-       --
-       -- ==== b. Namespace
-       -- This single character determines the directory entry's namespace. (eg. __A__ for articles, __I__ for images, etc.)
-       -- The comprehensive list is at http://www.openzim.org/wiki/ZIM_file_format#Namespaces.
-       --
-       -- ==== c. Cluster and Blob number
-       -- Only for 'ZimArticleEntry', this is the directory entry's Cluster and Blob number.
-       -- The Cluster number is a 4-byte index into the list of Clusters below.
-       -- The Blob number refers to a block inside the (decompressed) cluster.
-       -- Together, they provide the content of this directory entry.
-       --
-       -- ==== d. URL and Title
-       -- These 2 null-terminated strings represent the URL and Title of this directory entry respectively.
-       -- If the Title is empty, it is taken to be the same as the URL.
-       --
-       -- === 6. List of Clusters
-       -- This is a list of 8-byte file offsets, each pointing to a cluster in the file.
-       -- The end of a cluster is also the start of the next cluster.
-       -- Therefore, the length of a cluster is the difference between the adjacent offsets.
-       -- For the last cluster, the end is the Checksum file offset, as the Checksum is always
-       -- the last 16 bytes of a ZIM file.
-       --
-       -- ==== a. Compression Type
-       -- The first byte of the cluster determines if it is uncompressed (eg. PNG image) or compressed with LZMA (eg. HTML).
-       --
-       -- [@0 or 1@] No compression
-       -- [@4@] Compressed with LZMA
-       --
-       -- ==== b. List of Blobs
-       -- This is a list of 4-byte offsets, each pointing inside this cluster.
-       -- The end of a blob is also the start of the next blob.
-       -- Therefore, the length of a blob is the difference between the adjacent offsets.
-       -- The last offset points to the end of the data area so there is always one more offset than blobs.
+-- * ZIM file format
+-- | Following is a short summary of the ZIM file format.
+-- The authoritative reference is at
+-- http://www.openzim.org/wiki/ZIM_file_format.
+--
+-- === 1. ZIM header
+-- This is an 80-byte header (see 'ZimHeader'). Among other things, it contains
+-- file offsets to the below.
+--
+-- === 2. List of MIME types
+-- This is a sequence of null-terminated strings (eg. @text\/html@,
+-- @text\/javascript@). The last string is zero length, so the end always
+-- consists of 2 consecutive null bytes.
+--
+-- === 3. List of URLs
+-- This is a sequence of 8-byte file offsets, each pointing to a directory
+-- entry. This list is sorted by the directory entries' URL.
+--
+-- === 4. List of Titles
+-- This is a sequence of 4-byte indices, each pointing to a URL above (which in
+-- turn point to a directory entry). This list is sorted by the directory
+-- entries' Title.
+--
+-- === 5. Directory Entries
+-- This is a sequence of Directory Entries (see 'ZimDirEnt').
+-- The first 2 bytes determine the type of this entry, which also determine the
+-- length.
+-- Contents include:
+--
+-- ==== a. MIME type
+-- This 2-byte field means:
+--
+-- [@0xffff@] This directory entry is a 'ZimRedirectEntry'.
+-- [@0xfffe@] This directory entry is a 'ZimLinkTarget'.
+-- [@0xfffd@] This directory entry is a 'ZimDeletedEntry'.
+-- [@any other value@] This directory entry is a 'ZimArticleEntry' and this
+-- index into the MIME list from above determines its MIME type.
+--
+-- ==== b. Namespace
+-- This single character determines the directory entry's namespace.
+-- (eg. __A__ for articles, __I__ for images, etc.) The comprehensive list is
+-- at http://www.openzim.org/wiki/ZIM_file_format#Namespaces.
+--
+-- ==== c. Cluster and Blob number
+-- Only for 'ZimArticleEntry', this is the directory entry's Cluster and
+-- Blob number. The Cluster number is a 4-byte index into the list of Clusters
+-- below. The Blob number refers to a block inside the (decompressed) cluster.
+-- Together, they provide the content of this directory entry.
+--
+-- ==== d. URL and Title
+-- These 2 null-terminated strings represent the URL and Title of this directory
+-- entry respectively. If the Title is empty, it is taken to be the same as the
+-- URL.
+--
+-- === 6. List of Clusters
+-- This is a list of 8-byte file offsets, each pointing to a cluster in the
+-- file. -- The end of a cluster is also the start of the next cluster.
+-- Therefore, the length of a cluster is the difference between the adjacent
+-- offsets. For the last cluster, the end is the Checksum file offset, as the
+-- Checksum is always the last 16 bytes of a ZIM file.
+--
+-- ==== a. Compression Type
+-- The first byte of the cluster determines if it is uncompressed
+-- (eg. PNG image) or compressed with LZMA (eg. HTML).
+--
+-- [@0 or 1@] No compression
+-- [@4@] Compressed with LZMA
+--
+-- ==== b. List of Blobs
+-- This is a list of 4-byte offsets, each pointing inside this cluster.
+-- The end of a blob is also the start of the next blob.
+-- Therefore, the length of a blob is the difference between the adjacent
+-- offsets. The last offset points to the end of the data area so there is
+-- always one more offset than blobs.
        ) where
 
 import Control.Applicative ((<$>), (<*>))
@@ -210,15 +218,18 @@ import Data.Conduit.Serialization.Binary (sinkGet, conduitGet)
 import Data.Conduit.Lzma (decompress)
 
 import Data.Array.IArray ((!), listArray, Array)
-import Data.Binary.Get (Get, skip, getWord8, getWord16le, getWord32le, getWord64le, getByteString, getLazyByteStringNul, getRemainingLazyByteString)
+import Data.Binary.Get (Get, skip, getWord8, getWord16le, getWord32le
+                        , getWord64le, getByteString, getLazyByteStringNul
+                        , getRemainingLazyByteString)
 import Numeric (showHex)
 
 -- | Other than the below, ErrorCall can be thrown by LZMA library if there is a problem with decompression.
-data ZimException = ZimInvalidMagic       -- ^ ZIM file has invalid magic number (anything other than 72173914).
-                  | ZimParseError String  -- ^ There is an error in parsing.
-                  | ZimIncompleteInput    -- ^ There is insufficient bytes required to parse.
-                  | ZimInvalidIndex Int   -- ^ The given index (URL, title or cluster) is out of bounds for this ZIM file.
-                  deriving (Show, Typeable)
+data ZimException
+    = ZimInvalidMagic       -- ^ ZIM file has invalid magic number (anything other than 72173914).
+    | ZimParseError String  -- ^ There is an error in parsing.
+    | ZimIncompleteInput    -- ^ There is insufficient bytes required to parse.
+    | ZimInvalidIndex Int   -- ^ The given index (URL, title or cluster) is out of bounds for this ZIM file.
+    deriving (Show, Typeable)
 instance Exception ZimException
 
 -- | See http://www.openzim.org/wiki/ZIM_file_format#Header for more details.
@@ -258,7 +269,8 @@ data ZimDirEntType = ZimArticleEntry
                    | ZimDeletedEntry
                    deriving (Eq, Show)
 
--- | See http://www.openzim.org/wiki/ZIM_file_format#Directory_Entries for more details.
+-- | See http://www.openzim.org/wiki/ZIM_file_format#Directory_Entries for more
+-- details.
 data ZimDirEnt = ZimDirEnt
     {
     -- | Type of this Directory Entry
@@ -336,11 +348,18 @@ parseZimHeader = do
     checksumPos   <- fromIntegral <$> getWord64le
     return $ ZimHeader magicNumber version uuid articleCount clusterCount
                        urlPtrPos titlePtrPos clusterPtrPos mimeListPos
-                       (if mainPage == 0xffffffff then Nothing else Just mainPage)
-                       (if layoutPage == 0xffffffff then Nothing else Just layoutPage)
+                       (if mainPage == 0xffffffff
+                           then Nothing
+                           else Just mainPage)
+                       (if layoutPage == 0xffffffff
+                           then Nothing
+                           else Just layoutPage)
                        checksumPos
 
--- | Instances of this class represent a Zim File and are able to perform ZIM operations (getMimeList, getContent, etc). Valid instances include a Handle to a ZIM file, a FilePath to a ZIM file, or a (Handle, ZimHeader) where ZimHeader is parsed previously (so it does not need to be reparsed).
+-- | Instances of this class represent a Zim File and are able to perform ZIM
+-- operations (getMimeList, getContent, etc). Valid instances include a Handle
+-- to a ZIM file, a FilePath to a ZIM file, or a (Handle, ZimHeader) where
+-- ZimHeader is parsed previously (so it does not need to be reparsed).
 class RunZim h where
     runZim :: h -> (Handle -> ZimHeader -> IO a) -> IO a
 
@@ -368,7 +387,9 @@ parseByteStringsNul = conduitGet getLazyByteStringNul =$ loop id
         loop front = await >>= maybe
             (return $ front [])
             (\x -> let bs = BL.toStrict x
-                   in if B8.null bs then return (front []) else loop (front . (bs:))
+                   in if B8.null bs
+                         then return (front [])
+                         else loop (front . (bs:))
             )
 
 getMimeList :: RunZim h => h -> IO MimeList
@@ -622,4 +643,3 @@ instance ZimSearchDE TitlePrefix where
             let Just (TitleIndex lbi, lb') = lb
                 Just (TitleIndex ubi, ub') = ub
             return [(lbi, lb'), (ubi, ub')]
-
