@@ -1,2 +1,5 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "lts-5_8" }:
+let
+  tinc = import ./tinc.nix;
+in
+{ nixpkgs ? import <nixpkgs> {}, compiler ? tinc.compiler }:
 (import ./default.nix { inherit nixpkgs compiler; }).env

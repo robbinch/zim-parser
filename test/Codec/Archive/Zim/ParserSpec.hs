@@ -2,7 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Codec.Archive.Zim.ParserSpec (main, spec) where
 
-import Control.Applicative ((<$>))
+import Prelude ()
+import Prelude.Compat
 import Control.Monad (forM_)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
@@ -156,5 +157,3 @@ spec = do
 
         it "can get content from all URLs" $ \(hdl, hdr) -> do
           getAllArticles hdl hdr 457
-
-

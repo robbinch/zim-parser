@@ -19,6 +19,7 @@ extra-source-files: test/wikipedia_en_ray_charles_2015-06.zim
 
 dependencies:
   - base == 4.*
+  - base-compat
   - array
   - binary
   - bytestring
