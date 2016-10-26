@@ -200,6 +200,7 @@ module Codec.Archive.Zim.Parser (
 
 import           Prelude ()
 import           Prelude.Compat
+import           Codec.Compression.Lzma (decompress)
 import           Control.Exception (Exception, throw)
 import           Control.Monad (when)
 import qualified Data.ByteString as B
@@ -210,10 +211,8 @@ import           Data.Maybe (fromJust)
 import           Data.Typeable (Typeable)
 import           System.IO (Handle, IOMode (ReadMode), withBinaryFile)
 
-import           Control.Monad.Trans.Resource (runResourceT)
 import           Data.Conduit (Sink, await, ($$), (=$))
-import           Data.Conduit.Binary (sinkLbs, sourceHandleRange, sourceLbs)
-import           Data.Conduit.Lzma (decompress)
+import           Data.Conduit.Binary (sourceHandleRange, sourceLbs)
 import           Data.Conduit.Serialization.Binary (conduitGet, sinkGet)
 
 import           Data.Array.IArray (Array, listArray, (!))
@@ -461,7 +460,7 @@ getCluster h (ClusterNumber i) = runZim h $ \hdl hdr -> do
   case BL.uncons bs of
     Just (0, cluster) -> return $ Cluster cluster
     Just (1, cluster) -> return $ Cluster cluster
-    Just (4, cluster) -> Cluster <$> runResourceT (sourceLbs cluster $$ decompress Nothing =$ sinkLbs)
+    Just (4, cluster) -> return . Cluster $ decompress cluster
     Just (x, _) -> throw . ZimParseError $
       "Cluster " ++ show i ++ " (offset: " ++ showHex pos0 "" ++ ", length: " ++ show len ++ ") compressed with unsupported type: " ++ show x
     Nothing -> throw . ZimParseError $
