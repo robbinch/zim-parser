@@ -1,9 +1,9 @@
+{ nixpkgs }:
 rec {
-  compiler = "";
-  resolver = { nixpkgs ? import <nixpkgs> {}, compiler ? compiler }:
+  compiler = nixpkgs.haskell.packages."ghc7103";
+  resolver =
     let
-      oldResolver = if compiler == "" then nixpkgs.haskellPackages else builtins.getAttr compiler nixpkgs.haskell.packages;
-      callPackage = oldResolver.callPackage;
+      callPackage = compiler.callPackage;
 
       overrideFunction = self: super: rec {
         HUnit = callPackage
@@ -11,8 +11,8 @@ rec {
             { mkDerivation, base, deepseq, filepath, stdenv }:
             mkDerivation {
               pname = "HUnit";
-              version = "1.3.1.1";
-              sha256 = "1y4fv8r7xi302ahj6p71hvsgz3rkb2c4vw09j935ns5bj11grrck";
+              version = "1.3.1.2";
+              sha256 = "10akdh4fl615rrshxi3m5gf414il1q42z4zqyb6q4jasmscvzpms";
               libraryHaskellDepends = [ base deepseq ];
               testHaskellDepends = [ base deepseq filepath ];
               homepage = "https://github.com/hspec/HUnit#readme";
@@ -30,10 +30,7 @@ rec {
               pname = "ansi-terminal";
               version = "0.6.2.3";
               sha256 = "0hpfw0k025y681m9ml1c712skrb1p4vh7z5x1f0ci9ww7ssjrh2d";
-              isLibrary = true;
-              isExecutable = true;
               libraryHaskellDepends = [ base unix ];
-              executableHaskellDepends = [ base unix ];
               homepage = "https://github.com/feuerbach/ansi-terminal";
               description = "Simple ANSI terminal support, with Windows compatibility";
               license = stdenv.lib.licenses.bsd3;
@@ -58,16 +55,15 @@ rec {
             }
           )
           { inherit hspec QuickCheck; };
-        bindings-DSL = callPackage
+        fail = callPackage
           (
-            { mkDerivation, base, stdenv }:
+            { mkDerivation, stdenv }:
             mkDerivation {
-              pname = "bindings-DSL";
-              version = "1.0.23";
-              sha256 = "1rqhkk8hn1xjl3705dvakxx93q89vp0fw22v2cbrlapbir27cv7b";
-              libraryHaskellDepends = [ base ];
-              homepage = "https://github.com/jwiegley/bindings-dsl/wiki";
-              description = "FFI domain specific language, on top of hsc2hs";
+              pname = "fail";
+              version = "4.9.0.0";
+              sha256 = "18nlj6xvnggy61gwbyrpmvbdkq928wv0wx2zcsljb52kbhddnp3d";
+              homepage = "https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail";
+              description = "Forward-compatible MonadFail class";
               license = stdenv.lib.licenses.bsd3;
               doCheck = false;
               doHaddock = false;
@@ -79,8 +75,8 @@ rec {
             { mkDerivation, base, directory, filepath, hspec-meta, stdenv }:
             mkDerivation {
               pname = "hspec-discover";
-              version = "2.2.3";
-              sha256 = "0bx9nlc07vihkm0ykfz2fcwd5v6zszb1mw81mczi72k2mpbm6q6w";
+              version = "2.2.4";
+              sha256 = "1bz7wb8v0bx1amiz4bpj34xq97d1ia29n3f654wcrh6lacydp3dv";
               isLibrary = true;
               isExecutable = true;
               libraryHaskellDepends = [ base directory filepath ];
@@ -110,6 +106,28 @@ rec {
             }
           )
           { inherit HUnit; };
+        lzma = callPackage
+          (
+            { mkDerivation, base, bytestring, HUnit, lzma, QuickCheck, stdenv
+            , tasty, tasty-hunit, tasty-quickcheck
+            }:
+            mkDerivation {
+              pname = "lzma";
+              version = "0.0.0.3";
+              sha256 = "0i416gqi8j55nd1pqbkxvf3f6hn6fjys6gq98lkkxphva71j30xg";
+              libraryHaskellDepends = [ base bytestring ];
+              librarySystemDepends = [ lzma ];
+              testHaskellDepends = [
+                base bytestring HUnit QuickCheck tasty tasty-hunit tasty-quickcheck
+              ];
+              homepage = "https://github.com/hvr/lzma";
+              description = "LZMA/XZ compression and decompression";
+              license = stdenv.lib.licenses.bsd3;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit HUnit QuickCheck; inherit (nixpkgs) lzma; };
         mtl = callPackage
           (
             { mkDerivation, base, stdenv, transformers }:
@@ -130,16 +148,16 @@ rec {
           { };
         network = callPackage
           (
-            { mkDerivation, base, bytestring, HUnit, stdenv, test-framework
-            , test-framework-hunit, unix
+            { mkDerivation, base, bytestring, doctest, HUnit, stdenv
+            , test-framework, test-framework-hunit, unix
             }:
             mkDerivation {
               pname = "network";
-              version = "2.6.2.1";
-              sha256 = "1yhvpd4wigz165jvyvw9zslx7lgqdj63jh3zv5s74b5ykdfa3zd3";
+              version = "2.6.3.1";
+              sha256 = "1rl2gl37cf4k0ddsq93q15fwdz1l25nhl4w205krbh7d5dg5y12p";
               libraryHaskellDepends = [ base bytestring unix ];
               testHaskellDepends = [
-                base bytestring HUnit test-framework test-framework-hunit
+                base bytestring doctest HUnit test-framework test-framework-hunit
               ];
               homepage = "https://github.com/haskell/network";
               description = "Low-level networking interface";
@@ -272,8 +290,8 @@ rec {
             }:
             mkDerivation {
               pname = "blaze-builder";
-              version = "0.4.0.1";
-              sha256 = "1id3w33x9f7q5m3xpggmvzw03bkp94bpfyz81625bldqgf3yqdn1";
+              version = "0.4.0.2";
+              sha256 = "1m33y6p5xldni8p4fzg8fmsyqvkfmnimdamr1xjnsmgm3dkf9lws";
               libraryHaskellDepends = [ base bytestring deepseq text ];
               testHaskellDepends = [
                 base bytestring HUnit QuickCheck test-framework
@@ -327,98 +345,6 @@ rec {
             }
           )
           { inherit primitive random; };
-        QuickCheck = callPackage
-          (
-            { mkDerivation, base, containers, random, stdenv, template-haskell
-            , test-framework, tf-random, transformers
-            }:
-            mkDerivation {
-              pname = "QuickCheck";
-              version = "2.8.2";
-              sha256 = "1ai6k5v0bibaxq8xffcblc6rwmmk6gf8vjyd9p2h3y6vwbhlvilq";
-              libraryHaskellDepends = [
-                base containers random template-haskell tf-random transformers
-              ];
-              testHaskellDepends = [
-                base containers template-haskell test-framework
-              ];
-              homepage = "https://github.com/nick8325/quickcheck";
-              description = "Automatic testing of Haskell programs";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit random tf-random; };
-        quickcheck-io = callPackage
-          (
-            { mkDerivation, base, HUnit, QuickCheck, stdenv }:
-            mkDerivation {
-              pname = "quickcheck-io";
-              version = "0.1.2";
-              sha256 = "1kf1kfw9fsmly0rvzvdf6jvdw10qhkmikyj0wcwciw6wad95w9sh";
-              libraryHaskellDepends = [ base HUnit QuickCheck ];
-              homepage = "https://github.com/hspec/quickcheck-io#readme";
-              description = "Use HUnit assertions as QuickCheck properties";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit HUnit QuickCheck; };
-        hspec-core = callPackage
-          (
-            { mkDerivation, ansi-terminal, async, base, deepseq
-            , hspec-expectations, hspec-meta, HUnit, process, QuickCheck
-            , quickcheck-io, random, setenv, silently, stdenv, tf-random, time
-            , transformers
-            }:
-            mkDerivation {
-              pname = "hspec-core";
-              version = "2.2.3";
-              sha256 = "0llnr7gg1xa1l8jz9ivhjq7q12773x2i5xp3wlyyvq0sj9cnkyh1";
-              libraryHaskellDepends = [
-                ansi-terminal async base deepseq hspec-expectations HUnit
-                QuickCheck quickcheck-io random setenv tf-random time transformers
-              ];
-              testHaskellDepends = [
-                ansi-terminal async base deepseq hspec-expectations hspec-meta
-                HUnit process QuickCheck quickcheck-io random setenv silently
-                tf-random time transformers
-              ];
-              homepage = "http://hspec.github.io/";
-              description = "A Testing Framework for Haskell";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit ansi-terminal async hspec-expectations HUnit QuickCheck quickcheck-io random setenv tf-random; };
-        hspec = callPackage
-          (
-            { mkDerivation, base, directory, hspec-core, hspec-discover
-            , hspec-expectations, hspec-meta, HUnit, QuickCheck, stdenv
-            , stringbuilder, transformers
-            }:
-            mkDerivation {
-              pname = "hspec";
-              version = "2.2.3";
-              sha256 = "0432dxkxrmsvz78g8inwhklid677161yp8r0pw8cd1bdx179j7ji";
-              libraryHaskellDepends = [
-                base hspec-core hspec-discover hspec-expectations HUnit QuickCheck
-                transformers
-              ];
-              testHaskellDepends = [
-                base directory hspec-core hspec-meta stringbuilder
-              ];
-              homepage = "http://hspec.github.io/";
-              description = "A Testing Framework for Haskell";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit hspec-core hspec-discover hspec-expectations HUnit QuickCheck; };
         transformers-compat = callPackage
           (
             { mkDerivation, base, ghc-prim, stdenv, transformers }:
@@ -443,8 +369,8 @@ rec {
             }:
             mkDerivation {
               pname = "exceptions";
-              version = "0.8.2.1";
-              sha256 = "0d8hhmnryn80cnal1r1p5323v7y8z35vny0cwmaihjphy9zqfdf4";
+              version = "0.8.3";
+              sha256 = "1gl7xzffsqmigam6zg0jsglncgzxqafld2p6kb7ccp9xirzdjsjd";
               libraryHaskellDepends = [
                 base mtl stm template-haskell transformers transformers-compat
               ];
@@ -479,6 +405,26 @@ rec {
             }
           )
           { inherit mtl transformers-compat; };
+        tagged = callPackage
+          (
+            { mkDerivation, base, deepseq, stdenv, template-haskell
+            , transformers, transformers-compat
+            }:
+            mkDerivation {
+              pname = "tagged";
+              version = "0.8.5";
+              sha256 = "16cdzh0bw16nvjnyyy5j9s60malhz4nnazw96vxb0xzdap4m2z74";
+              libraryHaskellDepends = [
+                base deepseq template-haskell transformers transformers-compat
+              ];
+              homepage = "http://github.com/ekmett/tagged";
+              description = "Haskell 98 phantom types to avoid unsafely passing dummy arguments";
+              license = stdenv.lib.licenses.bsd3;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit transformers-compat; };
         transformers-base = callPackage
           (
             { mkDerivation, base, stdenv, stm, transformers
@@ -508,8 +454,8 @@ rec {
             }:
             mkDerivation {
               pname = "monad-control";
-              version = "1.0.0.5";
-              sha256 = "1ya3i7x7p643fbrylf6bh8731mjvgn067qw2h8ijqbn805bp2pq5";
+              version = "1.0.1.0";
+              sha256 = "1x018gi5irznx5rgzmkr2nrgh26r8cvqwkcfc6n6y05pdjf21c6l";
               libraryHaskellDepends = [
                 base stm transformers transformers-base transformers-compat
               ];
@@ -529,8 +475,8 @@ rec {
             }:
             mkDerivation {
               pname = "lifted-base";
-              version = "0.2.3.6";
-              sha256 = "1yz14a1rsgknwyl08n4kxrlc26hfwmb95a3c2drbnsgmhdyq7iap";
+              version = "0.2.3.8";
+              sha256 = "17yz4n7q96x4cp8vxai8csn2vmpigxvipkfh48arahf91f0xy18n";
               libraryHaskellDepends = [ base monad-control transformers-base ];
               testHaskellDepends = [
                 base HUnit monad-control test-framework test-framework-hunit
@@ -552,8 +498,8 @@ rec {
             }:
             mkDerivation {
               pname = "resourcet";
-              version = "1.1.7.3";
-              sha256 = "1gz140ffsd61vsc1bn0sxjl337x2xghfh0f8c5p1af5vga4mmk7w";
+              version = "1.1.7.5";
+              sha256 = "0nj0gwfd05divpdn7m47gy6bpcrwn3zk81gc303k0smrbqi0xlq5";
               libraryHaskellDepends = [
                 base containers exceptions lifted-base mmorph monad-control mtl
                 transformers transformers-base transformers-compat
@@ -575,8 +521,8 @@ rec {
             }:
             mkDerivation {
               pname = "conduit";
-              version = "1.2.6.4";
-              sha256 = "1wvkfnsb05swn5dbysxr2vwibqic6sjjhjbidwcsigqfb03y9i8z";
+              version = "1.2.7";
+              sha256 = "1r9vxpbcy441niw80byg68gkkn2xrqbz8l6x1q4d70fgassivcin";
               libraryHaskellDepends = [
                 base exceptions lifted-base mmorph mtl resourcet transformers
                 transformers-base
@@ -593,32 +539,144 @@ rec {
             }
           )
           { inherit exceptions hspec lifted-base mmorph mtl QuickCheck resourcet transformers-base; };
-        lzma-conduit = callPackage
+        unordered-containers = callPackage
           (
-            { mkDerivation, base, bindings-DSL, bytestring, conduit, HUnit
-            , lzma, QuickCheck, resourcet, stdenv, test-framework
-            , test-framework-hunit, test-framework-quickcheck2, transformers
+            { mkDerivation, base, ChasingBottoms, containers, deepseq, hashable
+            , HUnit, QuickCheck, stdenv, test-framework, test-framework-hunit
+            , test-framework-quickcheck2
             }:
             mkDerivation {
-              pname = "lzma-conduit";
-              version = "1.1.3.0";
-              sha256 = "03rrxxd2h93civbd72lh41xhfziylyknyyi34dcxifx2aahfgydb";
-              libraryHaskellDepends = [
-                base bindings-DSL bytestring conduit resourcet transformers
-              ];
-              librarySystemDepends = [ lzma ];
+              pname = "unordered-containers";
+              version = "0.2.7.1";
+              sha256 = "00npqiphivjp2d7ryqsdavfn4m5v3w1lq2azhdsrfh0wsvqpg4ig";
+              libraryHaskellDepends = [ base deepseq hashable ];
               testHaskellDepends = [
-                base bytestring conduit HUnit QuickCheck resourcet test-framework
-                test-framework-hunit test-framework-quickcheck2
+                base ChasingBottoms containers hashable HUnit QuickCheck
+                test-framework test-framework-hunit test-framework-quickcheck2
               ];
-              homepage = "http://github.com/alphaHeavy/lzma-conduit";
-              description = "Conduit interface for lzma/xz compression";
+              homepage = "https://github.com/tibbe/unordered-containers";
+              description = "Efficient hashing-based container types";
               license = stdenv.lib.licenses.bsd3;
               doCheck = false;
               doHaddock = false;
             }
           )
-          { inherit bindings-DSL conduit HUnit QuickCheck resourcet; inherit (nixpkgs) lzma; };
+          { inherit hashable HUnit QuickCheck; };
+        semigroups = callPackage
+          (
+            { mkDerivation, base, stdenv, hashable, tagged, text, unordered-containers }:
+            mkDerivation {
+              pname = "semigroups";
+              version = "0.18.2";
+              sha256 = "1r6hsn3am3dpf4rprrj4m04d9318v9iq02bin0pl29dg4a3gzjax";
+              libraryHaskellDepends = [ base hashable tagged text unordered-containers ];
+              homepage = "http://github.com/ekmett/semigroups/";
+              description = "Anything that associates";
+              license = stdenv.lib.licenses.bsd3;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit hashable tagged text unordered-containers; };
+        QuickCheck = callPackage
+          (
+            { mkDerivation, base, containers, random, stdenv, template-haskell
+            , test-framework, tf-random, transformers, semigroups
+            }:
+            mkDerivation {
+              pname = "QuickCheck";
+              version = "2.9.2";
+              sha256 = "119np67qvx8hyp9vkg4gr2wv3lj3j6ay2vl4hxspkg43ymb1cp0m";
+              libraryHaskellDepends = [
+                base containers random template-haskell tf-random transformers semigroups
+              ];
+              testHaskellDepends = [
+                base containers template-haskell test-framework semigroups
+              ];
+              homepage = "https://github.com/nick8325/quickcheck";
+              description = "Automatic testing of Haskell programs";
+              license = stdenv.lib.licenses.bsd3;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit random tf-random semigroups; };
+        quickcheck-io = callPackage
+          (
+            { mkDerivation, base, HUnit, QuickCheck, stdenv }:
+            mkDerivation {
+              pname = "quickcheck-io";
+              version = "0.1.3";
+              sha256 = "1d68fcb9cx1bk8yzq28d4hbwjwj4y5y0kldd1nxlq7n54r75i66p";
+              revision = "1";
+              editedCabalFile = "9c0af3d194aa2d469c4cde8e26ad6566af32685face8ddb17919960f424c357a";
+              libraryHaskellDepends = [ base HUnit QuickCheck ];
+              homepage = "https://github.com/hspec/quickcheck-io#readme";
+              description = "Use HUnit assertions as QuickCheck properties";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit HUnit QuickCheck; };
+        hspec-core = callPackage
+          (
+            { mkDerivation, ansi-terminal, async, base, deepseq
+            , hspec-expectations, hspec-meta, HUnit, process, QuickCheck
+            , quickcheck-io, random, setenv, silently, stdenv, tf-random, time
+            , transformers
+            }:
+            mkDerivation {
+              pname = "hspec-core";
+              version = "2.2.4";
+              sha256 = "0x845ngfl6vf65fnpb5mm3wj0ql45pz11bnm0x4gxc4ybd9c52ij";
+              revision = "1";
+              editedCabalFile = "9a0c9fc612eb71ee55ebcaacbce010b87ffef8a535ed6ee1f50d8bd952dc86c3";
+              libraryHaskellDepends = [
+                ansi-terminal async base deepseq hspec-expectations HUnit
+                QuickCheck quickcheck-io random setenv tf-random time transformers
+              ];
+              testHaskellDepends = [
+                ansi-terminal async base deepseq hspec-expectations hspec-meta
+                HUnit process QuickCheck quickcheck-io random setenv silently
+                tf-random time transformers
+              ];
+              homepage = "http://hspec.github.io/";
+              description = "A Testing Framework for Haskell";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit ansi-terminal async hspec-expectations HUnit QuickCheck quickcheck-io random setenv tf-random; };
+        hspec = callPackage
+          (
+            { mkDerivation, base, directory, hspec-core, hspec-discover
+            , hspec-expectations, hspec-meta, HUnit, QuickCheck, stdenv
+            , stringbuilder, transformers
+            }:
+            mkDerivation {
+              pname = "hspec";
+              version = "2.2.4";
+              sha256 = "1cf90gqvg1iknja6ymxqxyabpahcxni3blqllh81ywbir3whljvj";
+              revision = "1";
+              editedCabalFile = "eb22cb737adc3312b21699b6ac4137489590ada1ee9ee9ae21aae3c342b3880f";
+              libraryHaskellDepends = [
+                base hspec-core hspec-discover hspec-expectations HUnit QuickCheck
+                transformers
+              ];
+              testHaskellDepends = [
+                base directory hspec-core hspec-discover hspec-expectations
+                hspec-meta HUnit QuickCheck stringbuilder transformers
+              ];
+              homepage = "http://hspec.github.io/";
+              description = "A Testing Framework for Haskell";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit hspec-core hspec-discover hspec-expectations HUnit QuickCheck; };
         vector = callPackage
           (
             { mkDerivation, base, deepseq, ghc-prim, primitive, QuickCheck
@@ -651,10 +709,8 @@ rec {
             }:
             mkDerivation {
               pname = "binary-conduit";
-              version = "1.2.3";
-              sha256 = "0ymhxyf754j1pki7ap2vay8f9j49rzsjzp5yr253sn5wpw3qg8fr";
-              revision = "1";
-              editedCabalFile = "9cb1c58171575429a65947d1ef7e22c1501b4ca9becc07904c7b4a5066345e29";
+              version = "1.2.4.1";
+              sha256 = "10nalqf3zhg49b5drhw4y8zv9c3nsnlbc7bvw9la8vgzpihbnp24";
               libraryHaskellDepends = [
                 base binary bytestring conduit resourcet vector
               ];
@@ -679,8 +735,8 @@ rec {
             }:
             mkDerivation {
               pname = "scientific";
-              version = "0.3.4.6";
-              sha256 = "10pk3l32iqr88pad2ijz5050jiqsjzk16w8dygssxkkrndr5rldx";
+              version = "0.3.4.9";
+              sha256 = "1a0q15kq0pk3pabxh536wgphh8713hhn8n55gm6s1y8a5dk310qh";
               libraryHaskellDepends = [
                 base binary bytestring containers deepseq ghc-prim hashable
                 integer-gmp text vector
@@ -700,22 +756,21 @@ rec {
         attoparsec = callPackage
           (
             { mkDerivation, array, base, bytestring, containers, deepseq
-            , QuickCheck, quickcheck-unicode, scientific, stdenv
-            , test-framework, test-framework-quickcheck2, text, transformers
-            , vector
+            , QuickCheck, quickcheck-unicode, scientific, stdenv, tasty
+            , tasty-quickcheck, text, transformers, vector, fail, semigroups
             }:
             mkDerivation {
               pname = "attoparsec";
-              version = "0.13.0.1";
-              sha256 = "0cprkr7bl4lrr80pz8mryb4rbfwdgpsrl7g0fbcaybhl8p5hm26f";
+              version = "0.13.1.0";
+              sha256 = "0r1zrrkbqv8w4pb459fj5izd1h85p9nrsp3gyzj7qiayjpa79p2j";
               libraryHaskellDepends = [
                 array base bytestring containers deepseq scientific text
-                transformers
+                transformers fail semigroups
               ];
               testHaskellDepends = [
-                array base bytestring containers deepseq QuickCheck
-                quickcheck-unicode scientific test-framework
-                test-framework-quickcheck2 text transformers vector
+                array base bytestring deepseq QuickCheck quickcheck-unicode
+                scientific tasty tasty-quickcheck text transformers vector
+                fail semigroups
               ];
               homepage = "https://github.com/bos/attoparsec";
               description = "Fast combinator parsing for bytestrings and text";
@@ -724,7 +779,7 @@ rec {
               doHaddock = false;
             }
           )
-          { inherit QuickCheck scientific text vector; };
+          { inherit QuickCheck scientific text vector fail semigroups; };
         zlib = callPackage
           (
             { mkDerivation, base, bytestring, HUnit, QuickCheck, stdenv, tasty
@@ -756,8 +811,8 @@ rec {
             }:
             mkDerivation {
               pname = "streaming-commons";
-              version = "0.1.15.2";
-              sha256 = "17a9gnkcwgb9rr2kv413ash4gb45dhhpfz1ns60w1rwcc1ad22i3";
+              version = "0.1.16";
+              sha256 = "0vhhm0z88b1r6s50bskdfh73acwfypm614nycmi9jwiyh84zbz8p";
               libraryHaskellDepends = [
                 array async base blaze-builder bytestring directory network process
                 random stm text transformers unix zlib
@@ -778,23 +833,23 @@ rec {
           (
             { mkDerivation, async, attoparsec, base, blaze-builder, bytestring
             , bytestring-builder, conduit, directory, exceptions, filepath
-            , hspec, monad-control, network, primitive, process, resourcet
-            , stdenv, stm, streaming-commons, text, transformers
+            , hspec, monad-control, network, primitive, process, QuickCheck
+            , resourcet, stdenv, stm, streaming-commons, text, transformers
             , transformers-base
             }:
             mkDerivation {
               pname = "conduit-extra";
-              version = "1.1.11";
-              sha256 = "0bzac4cf24r4lgnvi06zvm63hjbjcsg7zzmmz8glvmqnbgwhj037";
+              version = "1.1.13.3";
+              sha256 = "0j3cqpkrn7lbpviv6w0gjh93fjjbh1an2sq0yz7svaawja8civy2";
               libraryHaskellDepends = [
-                attoparsec base blaze-builder bytestring conduit directory
+                async attoparsec base blaze-builder bytestring conduit directory
                 exceptions filepath monad-control network primitive process
                 resourcet stm streaming-commons text transformers transformers-base
               ];
               testHaskellDepends = [
                 async attoparsec base blaze-builder bytestring bytestring-builder
-                conduit exceptions hspec process resourcet stm streaming-commons
-                text transformers transformers-base
+                conduit exceptions hspec process QuickCheck resourcet stm
+                streaming-commons text transformers transformers-base
               ];
               homepage = "http://github.com/snoyberg/conduit";
               description = "Batteries included conduit: adapters for common libraries";
@@ -803,10 +858,10 @@ rec {
               doHaddock = false;
             }
           )
-          { inherit async attoparsec blaze-builder conduit exceptions hspec monad-control network primitive resourcet stm streaming-commons text transformers-base; };
+          { inherit async attoparsec blaze-builder conduit exceptions hspec monad-control network primitive QuickCheck resourcet stm streaming-commons text transformers-base; };
       };
 
-      newResolver = oldResolver.override {
+      newResolver = compiler.override {
         overrides = overrideFunction;
       };
 

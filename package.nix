@@ -1,6 +1,5 @@
 { mkDerivation, array, base, base-compat, binary, binary-conduit
-, bytestring, conduit, conduit-extra, hspec, lzma-conduit
-, resourcet, stdenv
+, bytestring, conduit, conduit-extra, hspec, lzma, stdenv
 }:
 mkDerivation {
   pname = "zim-parser";
@@ -8,11 +7,11 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     array base base-compat binary binary-conduit bytestring conduit
-    conduit-extra lzma-conduit resourcet
+    conduit-extra lzma
   ];
   testHaskellDepends = [
     array base base-compat binary binary-conduit bytestring conduit
-    conduit-extra hspec lzma-conduit resourcet
+    conduit-extra hspec lzma
   ];
   homepage = "https://github.com/robbinch/zim-parser#readme";
   description = "Read and parse ZIM files";
