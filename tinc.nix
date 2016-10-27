@@ -1,6 +1,6 @@
 { nixpkgs }:
 rec {
-  compiler = nixpkgs.haskell.packages."ghc7103";
+  compiler = nixpkgs.haskellPackages;
   resolver =
     let
       callPackage = compiler.callPackage;
@@ -55,21 +55,6 @@ rec {
             }
           )
           { inherit hspec QuickCheck; };
-        fail = callPackage
-          (
-            { mkDerivation, stdenv }:
-            mkDerivation {
-              pname = "fail";
-              version = "4.9.0.0";
-              sha256 = "18nlj6xvnggy61gwbyrpmvbdkq928wv0wx2zcsljb52kbhddnp3d";
-              homepage = "https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail";
-              description = "Forward-compatible MonadFail class";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { };
         hspec-discover = callPackage
           (
             { mkDerivation, base, directory, filepath, hspec-meta, stdenv }:
@@ -345,6 +330,105 @@ rec {
             }
           )
           { inherit primitive random; };
+        QuickCheck = callPackage
+          (
+            { mkDerivation, base, containers, random, stdenv, template-haskell
+            , test-framework, tf-random, transformers, semigroups
+            }:
+            mkDerivation {
+              pname = "QuickCheck";
+              version = "2.9.2";
+              sha256 = "119np67qvx8hyp9vkg4gr2wv3lj3j6ay2vl4hxspkg43ymb1cp0m";
+              libraryHaskellDepends = [
+                base containers random template-haskell tf-random transformers semigroups
+              ];
+              testHaskellDepends = [
+                base containers template-haskell test-framework semigroups
+              ];
+              homepage = "https://github.com/nick8325/quickcheck";
+              description = "Automatic testing of Haskell programs";
+              license = stdenv.lib.licenses.bsd3;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit random tf-random; };
+        quickcheck-io = callPackage
+          (
+            { mkDerivation, base, HUnit, QuickCheck, stdenv }:
+            mkDerivation {
+              pname = "quickcheck-io";
+              version = "0.1.3";
+              sha256 = "1d68fcb9cx1bk8yzq28d4hbwjwj4y5y0kldd1nxlq7n54r75i66p";
+              revision = "1";
+              editedCabalFile = "9c0af3d194aa2d469c4cde8e26ad6566af32685face8ddb17919960f424c357a";
+              libraryHaskellDepends = [ base HUnit QuickCheck ];
+              homepage = "https://github.com/hspec/quickcheck-io#readme";
+              description = "Use HUnit assertions as QuickCheck properties";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit HUnit QuickCheck; };
+        hspec-core = callPackage
+          (
+            { mkDerivation, ansi-terminal, async, base, deepseq
+            , hspec-expectations, hspec-meta, HUnit, process, QuickCheck
+            , quickcheck-io, random, setenv, silently, stdenv, tf-random, time
+            , transformers
+            }:
+            mkDerivation {
+              pname = "hspec-core";
+              version = "2.2.4";
+              sha256 = "0x845ngfl6vf65fnpb5mm3wj0ql45pz11bnm0x4gxc4ybd9c52ij";
+              revision = "1";
+              editedCabalFile = "9a0c9fc612eb71ee55ebcaacbce010b87ffef8a535ed6ee1f50d8bd952dc86c3";
+              libraryHaskellDepends = [
+                ansi-terminal async base deepseq hspec-expectations HUnit
+                QuickCheck quickcheck-io random setenv tf-random time transformers
+              ];
+              testHaskellDepends = [
+                ansi-terminal async base deepseq hspec-expectations hspec-meta
+                HUnit process QuickCheck quickcheck-io random setenv silently
+                tf-random time transformers
+              ];
+              homepage = "http://hspec.github.io/";
+              description = "A Testing Framework for Haskell";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit ansi-terminal async hspec-expectations HUnit QuickCheck quickcheck-io random setenv tf-random; };
+        hspec = callPackage
+          (
+            { mkDerivation, base, directory, hspec-core, hspec-discover
+            , hspec-expectations, hspec-meta, HUnit, QuickCheck, stdenv
+            , stringbuilder, transformers
+            }:
+            mkDerivation {
+              pname = "hspec";
+              version = "2.2.4";
+              sha256 = "1cf90gqvg1iknja6ymxqxyabpahcxni3blqllh81ywbir3whljvj";
+              revision = "1";
+              editedCabalFile = "eb22cb737adc3312b21699b6ac4137489590ada1ee9ee9ae21aae3c342b3880f";
+              libraryHaskellDepends = [
+                base hspec-core hspec-discover hspec-expectations HUnit QuickCheck
+                transformers
+              ];
+              testHaskellDepends = [
+                base directory hspec-core hspec-discover hspec-expectations
+                hspec-meta HUnit QuickCheck stringbuilder transformers
+              ];
+              homepage = "http://hspec.github.io/";
+              description = "A Testing Framework for Haskell";
+              license = stdenv.lib.licenses.mit;
+              doCheck = false;
+              doHaddock = false;
+            }
+          )
+          { inherit hspec-core hspec-discover hspec-expectations HUnit QuickCheck; };
         transformers-compat = callPackage
           (
             { mkDerivation, base, ghc-prim, stdenv, transformers }:
@@ -405,26 +489,6 @@ rec {
             }
           )
           { inherit mtl transformers-compat; };
-        tagged = callPackage
-          (
-            { mkDerivation, base, deepseq, stdenv, template-haskell
-            , transformers, transformers-compat
-            }:
-            mkDerivation {
-              pname = "tagged";
-              version = "0.8.5";
-              sha256 = "16cdzh0bw16nvjnyyy5j9s60malhz4nnazw96vxb0xzdap4m2z74";
-              libraryHaskellDepends = [
-                base deepseq template-haskell transformers transformers-compat
-              ];
-              homepage = "http://github.com/ekmett/tagged";
-              description = "Haskell 98 phantom types to avoid unsafely passing dummy arguments";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit transformers-compat; };
         transformers-base = callPackage
           (
             { mkDerivation, base, stdenv, stm, transformers
@@ -539,144 +603,6 @@ rec {
             }
           )
           { inherit exceptions hspec lifted-base mmorph mtl QuickCheck resourcet transformers-base; };
-        unordered-containers = callPackage
-          (
-            { mkDerivation, base, ChasingBottoms, containers, deepseq, hashable
-            , HUnit, QuickCheck, stdenv, test-framework, test-framework-hunit
-            , test-framework-quickcheck2
-            }:
-            mkDerivation {
-              pname = "unordered-containers";
-              version = "0.2.7.1";
-              sha256 = "00npqiphivjp2d7ryqsdavfn4m5v3w1lq2azhdsrfh0wsvqpg4ig";
-              libraryHaskellDepends = [ base deepseq hashable ];
-              testHaskellDepends = [
-                base ChasingBottoms containers hashable HUnit QuickCheck
-                test-framework test-framework-hunit test-framework-quickcheck2
-              ];
-              homepage = "https://github.com/tibbe/unordered-containers";
-              description = "Efficient hashing-based container types";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit hashable HUnit QuickCheck; };
-        semigroups = callPackage
-          (
-            { mkDerivation, base, stdenv, hashable, tagged, text, unordered-containers }:
-            mkDerivation {
-              pname = "semigroups";
-              version = "0.18.2";
-              sha256 = "1r6hsn3am3dpf4rprrj4m04d9318v9iq02bin0pl29dg4a3gzjax";
-              libraryHaskellDepends = [ base hashable tagged text unordered-containers ];
-              homepage = "http://github.com/ekmett/semigroups/";
-              description = "Anything that associates";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit hashable tagged text unordered-containers; };
-        QuickCheck = callPackage
-          (
-            { mkDerivation, base, containers, random, stdenv, template-haskell
-            , test-framework, tf-random, transformers, semigroups
-            }:
-            mkDerivation {
-              pname = "QuickCheck";
-              version = "2.9.2";
-              sha256 = "119np67qvx8hyp9vkg4gr2wv3lj3j6ay2vl4hxspkg43ymb1cp0m";
-              libraryHaskellDepends = [
-                base containers random template-haskell tf-random transformers semigroups
-              ];
-              testHaskellDepends = [
-                base containers template-haskell test-framework semigroups
-              ];
-              homepage = "https://github.com/nick8325/quickcheck";
-              description = "Automatic testing of Haskell programs";
-              license = stdenv.lib.licenses.bsd3;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit random tf-random semigroups; };
-        quickcheck-io = callPackage
-          (
-            { mkDerivation, base, HUnit, QuickCheck, stdenv }:
-            mkDerivation {
-              pname = "quickcheck-io";
-              version = "0.1.3";
-              sha256 = "1d68fcb9cx1bk8yzq28d4hbwjwj4y5y0kldd1nxlq7n54r75i66p";
-              revision = "1";
-              editedCabalFile = "9c0af3d194aa2d469c4cde8e26ad6566af32685face8ddb17919960f424c357a";
-              libraryHaskellDepends = [ base HUnit QuickCheck ];
-              homepage = "https://github.com/hspec/quickcheck-io#readme";
-              description = "Use HUnit assertions as QuickCheck properties";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit HUnit QuickCheck; };
-        hspec-core = callPackage
-          (
-            { mkDerivation, ansi-terminal, async, base, deepseq
-            , hspec-expectations, hspec-meta, HUnit, process, QuickCheck
-            , quickcheck-io, random, setenv, silently, stdenv, tf-random, time
-            , transformers
-            }:
-            mkDerivation {
-              pname = "hspec-core";
-              version = "2.2.4";
-              sha256 = "0x845ngfl6vf65fnpb5mm3wj0ql45pz11bnm0x4gxc4ybd9c52ij";
-              revision = "1";
-              editedCabalFile = "9a0c9fc612eb71ee55ebcaacbce010b87ffef8a535ed6ee1f50d8bd952dc86c3";
-              libraryHaskellDepends = [
-                ansi-terminal async base deepseq hspec-expectations HUnit
-                QuickCheck quickcheck-io random setenv tf-random time transformers
-              ];
-              testHaskellDepends = [
-                ansi-terminal async base deepseq hspec-expectations hspec-meta
-                HUnit process QuickCheck quickcheck-io random setenv silently
-                tf-random time transformers
-              ];
-              homepage = "http://hspec.github.io/";
-              description = "A Testing Framework for Haskell";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit ansi-terminal async hspec-expectations HUnit QuickCheck quickcheck-io random setenv tf-random; };
-        hspec = callPackage
-          (
-            { mkDerivation, base, directory, hspec-core, hspec-discover
-            , hspec-expectations, hspec-meta, HUnit, QuickCheck, stdenv
-            , stringbuilder, transformers
-            }:
-            mkDerivation {
-              pname = "hspec";
-              version = "2.2.4";
-              sha256 = "1cf90gqvg1iknja6ymxqxyabpahcxni3blqllh81ywbir3whljvj";
-              revision = "1";
-              editedCabalFile = "eb22cb737adc3312b21699b6ac4137489590ada1ee9ee9ae21aae3c342b3880f";
-              libraryHaskellDepends = [
-                base hspec-core hspec-discover hspec-expectations HUnit QuickCheck
-                transformers
-              ];
-              testHaskellDepends = [
-                base directory hspec-core hspec-discover hspec-expectations
-                hspec-meta HUnit QuickCheck stringbuilder transformers
-              ];
-              homepage = "http://hspec.github.io/";
-              description = "A Testing Framework for Haskell";
-              license = stdenv.lib.licenses.mit;
-              doCheck = false;
-              doHaddock = false;
-            }
-          )
-          { inherit hspec-core hspec-discover hspec-expectations HUnit QuickCheck; };
         vector = callPackage
           (
             { mkDerivation, base, deepseq, ghc-prim, primitive, QuickCheck
@@ -779,7 +705,7 @@ rec {
               doHaddock = false;
             }
           )
-          { inherit QuickCheck scientific text vector fail semigroups; };
+          { inherit QuickCheck scientific text vector; };
         zlib = callPackage
           (
             { mkDerivation, base, bytestring, HUnit, QuickCheck, stdenv, tasty
