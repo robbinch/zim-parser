@@ -392,7 +392,7 @@ getMimeList h = runZim h $ \hdl hdr -> do
   let (pos, len) = (Just $ zimMimeListPos hdr, Nothing)
       src        = sourceHandleRange hdl pos len
   mimeList <- src $$ parseByteStringsNul
-  return $ listArray (0, length mimeList) mimeList
+  return $ listArray (0, length mimeList - 1) mimeList
 
 parseZimDirEnt :: Get ZimDirEnt
 parseZimDirEnt = do
